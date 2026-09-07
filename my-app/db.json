@@ -1,0 +1,304 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "title": "Laptop",
+      "name": "Lenovo ThinkPad X1 Carbon",
+      "price": 1250
+    },
+    {
+      "id": 2,
+      "title": "Laptop",
+      "name": "Lenovo IdeaPad Slim 5",
+      "price": 780
+    },
+    {
+      "id": 3,
+      "title": "Laptop",
+      "name": "Dell Inspiron 15",
+      "price": 850
+    },
+    {
+      "id": 4,
+      "title": "Laptop",
+      "name": "Dell XPS 13",
+      "price": 1400
+    },
+    {
+      "id": 5,
+      "title": "Laptop",
+      "name": "HP Pavilion 15",
+      "price": 790
+    },
+    {
+      "id": 6,
+      "title": "Laptop",
+      "name": "HP Spectre x360",
+      "price": 1450
+    },
+    {
+      "id": 7,
+      "title": "Laptop",
+      "name": "Asus ZenBook 14",
+      "price": 980
+    },
+    {
+      "id": 8,
+      "title": "Laptop",
+      "name": "Asus ROG Strix G16",
+      "price": 1650
+    },
+    {
+      "id": 9,
+      "title": "Laptop",
+      "name": "Acer Aspire 7",
+      "price": 720
+    },
+    {
+      "id": 10,
+      "title": "Laptop",
+      "name": "MSI Modern 15",
+      "price": 810
+    },
+    {
+      "id": 11,
+      "title": "MacBook",
+      "name": "MacBook Air M2",
+      "price": 1499
+    },
+    {
+      "id": 12,
+      "title": "MacBook",
+      "name": "MacBook Pro 14 M3",
+      "price": 2199
+    },
+    {
+      "id": 13,
+      "title": "Phone",
+      "name": "iPhone 15",
+      "price": 999
+    },
+    {
+      "id": 14,
+      "title": "Phone",
+      "name": "iPhone 16 Pro",
+      "price": 1299
+    },
+    {
+      "id": 15,
+      "title": "Phone",
+      "name": "Samsung Galaxy S25",
+      "price": 1100
+    },
+    {
+      "id": 16,
+      "title": "Phone",
+      "name": "Samsung Galaxy A56",
+      "price": 480
+    },
+    {
+      "id": 17,
+      "title": "Phone",
+      "name": "Google Pixel 9",
+      "price": 899
+    },
+    {
+      "id": 18,
+      "title": "Phone",
+      "name": "OnePlus 13",
+      "price": 850
+    },
+    {
+      "id": 19,
+      "title": "Phone",
+      "name": "Xiaomi Redmi Note 15",
+      "price": 350
+    },
+    {
+      "id": 20,
+      "title": "Phone",
+      "name": "Realme GT 7",
+      "price": 520
+    },
+    {
+      "id": 21,
+      "title": "Tablet",
+      "name": "iPad Air",
+      "price": 699
+    },
+    {
+      "id": 22,
+      "title": "Tablet",
+      "name": "iPad Pro 13",
+      "price": 129
+    },
+    {
+      "id": 23,
+      "title": "Tablet",
+      "name": "Samsung Galaxy Tab S10",
+      "price": 920
+    },
+    {
+      "id": 24,
+      "title": "Tablet",
+      "name": "Lenovo Tab P12",
+      "price": 430
+    },
+    {
+      "id": 25,
+      "title": "Tablet",
+      "name": "Xiaomi Pad 7",
+      "price": 480
+    },
+    {
+      "id": 26,
+      "title": "Desktop",
+      "name": "Dell OptiPlex 7010",
+      "price": 980
+    },
+    {
+      "id": 27,
+      "title": "Desktop",
+      "name": "HP EliteDesk 800",
+      "price": 1020
+    },
+    {
+      "id": 28,
+      "title": "Desktop",
+      "name": "Lenovo ThinkCentre M90",
+      "price": 1090
+    },
+    {
+      "id": 29,
+      "title": "Gaming PC",
+      "name": "Predator Gaming Tower",
+      "price": 1890
+    },
+    {
+      "id": 30,
+      "title": "Gaming PC",
+      "name": "ROG Gaming Desktop",
+      "price": 2100
+    },
+    {
+      "id": 31,
+      "title": "Monitor",
+      "name": "LG UltraWide 34",
+      "price": 650
+    },
+    {
+      "id": 32,
+      "title": "Monitor",
+      "name": "Samsung Odyssey G5",
+      "price": 470
+    },
+    {
+      "id": 33,
+      "title": "Monitor",
+      "name": "Dell UltraSharp 27",
+      "price": 590
+    },
+    {
+      "id": 34,
+      "title": "Keyboard",
+      "name": "Logi Mechanical MX",
+      "price": 150
+    },
+    {
+      "id": 35,
+      "title": "Mouse",
+      "name": "Logi MX Master 3S",
+      "price": 120
+    },
+    {
+      "id": 36,
+      "title": "Headphones",
+      "name": "Sony WH-1000XM6",
+      "price": 420
+    },
+    {
+      "id": 37,
+      "title": "Headphones",
+      "name": "AirPods Pro 3",
+      "price": 299
+    },
+    {
+      "id": 38,
+      "title": "Speaker",
+      "name": "JBL Charge 6",
+      "price": 210
+    },
+    {
+      "id": 39,
+      "title": "Smart Watch",
+      "name": "Apple Watch Series 11",
+      "price": 499
+    },
+    {
+      "id": 40,
+      "title": "Smart Watch",
+      "name": "Galaxy Watch Ultra",
+      "price": 520
+    },
+    {
+      "id": 41,
+      "title": "Printer",
+      "name": "HP Smart Printer 520",
+      "price": 260
+    },
+    {
+      "id": 42,
+      "title": "Printer",
+      "name": "Canon Pixma G4010",
+      "price": 310
+    },
+    {
+      "id": 43,
+      "title": "SSD",
+      "name": "Samsung 990 Pro 1TB",
+      "price": 180
+    },
+    {
+      "id": 44,
+      "title": "SSD",
+      "name": "Kingston NV3 1TB",
+      "price": 95
+    },
+    {
+      "id": 45,
+      "title": "Graphics Card",
+      "name": "RTX 5070",
+      "price": 799
+    },
+    {
+      "id": 46,
+      "title": "Graphics Card",
+      "name": "RX 9070 XT",
+      "price": 749
+    },
+    {
+      "id": 47,
+      "title": "Router",
+      "name": "TP-Link Archer AX73",
+      "price": 160
+    },
+    {
+      "id": 48,
+      "title": "Power Bank",
+      "name": "Anker PowerCore 20000",
+      "price": 65
+    },
+    {
+      "id": 49,
+      "title": "Camera",
+      "name": "Canon EOS R10",
+      "price": 980
+    },
+    {
+      "id": 50,
+      "title": "Drone",
+      "name": "SkyVision Mini Pro",
+      "price": 699
+    }
+  ]
+}
