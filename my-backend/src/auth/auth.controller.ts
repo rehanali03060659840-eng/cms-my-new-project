@@ -27,4 +27,9 @@ export class AuthController {
   me(@Req() req: any) {
     return req.user;
   }
+
+  @Post("register")
+  register(@Body() body: { name: string; username: string; email: string; password: string }) {
+    return this.authService.register(body);
+  }
 }

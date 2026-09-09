@@ -27,6 +27,7 @@ import { NotificationModule } from './notification/notification.module';
 import { UsersModule } from './users/users.module';
 import { SeedModule } from './seed/seed.module';
 import { LiveMeetModule } from './live-meet/live-meet.module';
+import { AnimeModule } from './anime/anime.module';
 
 @Module({
   imports: [
@@ -36,7 +37,7 @@ import { LiveMeetModule } from './live-meet/live-meet.module';
     }),
     CategoryModule,
     UsersModule,
-    MongooseModule.forRoot('mongodb://127.0.0.1:27017/RehanAli'),
+    MongooseModule.forRoot(process.env.MONGO_URI as string),
     AuthModule,
     IndexModule,
     UploadModule,
@@ -48,6 +49,7 @@ import { LiveMeetModule } from './live-meet/live-meet.module';
     // UsersModule,
     SeedModule,
     LiveMeetModule,
+    AnimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

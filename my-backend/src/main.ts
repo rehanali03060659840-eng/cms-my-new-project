@@ -1,8 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
-// import { ValidationPipe } from '@nestjs/common';
-
 import { join } from 'path';
 import { AppModule } from './app.module';
 
@@ -12,27 +10,24 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
-  //   app.useGlobalPipes(
-  //   new ValidationPipe({
-  //     whitelist: true,
-  //     transform: true,
-  //   }),
-  // );
-
-  // app.enableCors({
-  //   origin: ['http://localhost:5173'],
-  //   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  //   credentials: true,
-  // });
 
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: [
+      'http://localhost:5173',
+      'https://live-meet-ffc37.web.app',
+      'https://live-meet-ffc37.firebaseapp.com',
+    ],
     credentials: true,
   });
 
   app.use(json({ limit: '100mb' }));
   app.use(urlencoded({ extended: true, limit: '100mb' }));
 
-  await app.listen(3000);
+  const port = process.env.PORT || 3000;
+
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`Backend running on port ${port}`);
 }
+
 bootstrap();
