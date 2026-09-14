@@ -223,20 +223,21 @@ export const Users = () => {
       </div>
       <div className="flex justify-between item-center py-3 shadow-sm">
         <div className="flex ml-4 font:semi-bold text-bold">
-          <label>Users List</label>
-        <select className="w-20 h-8 rounded-sm border px-2 text-xs font-medium ">
+          <label className="p-1 text-blue-400 rounded-lg">Users List</label>
+        <select className="w-15 h-6 mr-8 mt-1 rounded-sm border px-2 text-xs font-medium hover:bg-green-50">
+          <option value="10">10</option>
           <option value="20">20</option>
           <option value="30">30</option>
           <option value="40">40</option>
         </select>
         </div>
-        <div className="grid grid-cols-2 gap-x-8">
-          <button className="bg-gray-400 px-8 py-2 font-semibold hover:bg-gray-300 rounded-[5px]">
-            <IoIosArrowBack />
+        <div className="grid grid-cols-2 gap-x-8 mr-6 mt-1">
+          <button className="disabled:opacity-40">
+            <IoIosArrowBack className="w-6 h-6 rounded-[50%] border"/>
           </button>
           <div>
-            <button className="bg-blue-400 px-8 py-2 rounded disabled:opacity-50">
-              <IoIosArrowForward />
+            <button className="disabled:opacity-50">
+              <IoIosArrowForward className="w-6 h-6 rounded-[50%] border"/>
             </button>
           </div>
         </div>

@@ -3,13 +3,14 @@ import { CgMenuGridR, CgLogOut } from "react-icons/cg";
 import { useAuth } from "../context/AuthContext";
 import { RiDashboardFill } from "react-icons/ri";
 import { BiCategory } from "react-icons/bi";
-import { LuFilePenLine, LuVideo } from "react-icons/lu";
+import { FilePenLine, Video } from "lucide-react";
 import { FaWpforms } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
 import { useState } from "react";
 import { GoChevronDown } from "react-icons/go";
 import { BsCameraReels } from "react-icons/bs";
 import { hasPermission } from "../utils/Permissions";
+import { Tv, Upload, Shield, UserRound } from "lucide-react";
 
 export const Sidebar = () => {
   const { logout, user } = useAuth();
@@ -75,9 +76,37 @@ export const Sidebar = () => {
         {hasPermission(user?.role!, "blog") && (
           <NavLink to="/blogs" className={linkStyles}>
             <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <LuFilePenLine />
+              <FilePenLine />
             </div>
             <span>Blog</span>
+          </NavLink>
+        )}
+        <NavLink to="/anime" className={linkStyles}>
+          <div className="mr-2.5 flex w-4 justify-center text-[16px]">
+            <Tv />
+          </div>
+          <span>Anime</span>
+        </NavLink>
+        <NavLink to="/anime/room" className={linkStyles}>
+          <div className="mr-2.5 flex w-4 justify-center text-[16px]">
+            <UserRound />
+          </div>
+          <span>My Room</span>
+        </NavLink>
+        {(user?.role === "super_admin" || user?.role === "admin") && (
+          <NavLink to="/anime/upload" className={linkStyles}>
+            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
+              <Upload />
+            </div>
+            <span>Upload</span>
+          </NavLink>
+        )}
+        {user?.role === "super_admin" && (
+          <NavLink to="/anime/admin" className={linkStyles}>
+            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
+              <Shield />
+            </div>
+            <span>Anime Admin</span>
           </NavLink>
         )}
         {hasPermission(user?.role!, "reels") && (
@@ -90,7 +119,7 @@ export const Sidebar = () => {
         )}
         <NavLink to="/live-meet" className={linkStyles}>
           <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-            <LuVideo />
+            <Video />
           </div>
           <span>Live Meet</span>
         </NavLink>

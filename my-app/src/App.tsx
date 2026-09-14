@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Outlet } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { Home } from "./Pages/home";
 import { Category } from "./Pages/Category";
@@ -7,6 +7,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { LiveMeetSocketProvider } from "./context/LiveMeetSocketContext";
 import { AppLayout } from "./SideBar/AppLayout";
 import { Login } from "./Pages/Login";
+import { Register } from "./Pages/Register";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/Role.Routes";
 import { BlogPage } from "./Pages/Blogging/blogPage";
@@ -18,6 +19,13 @@ import { TrendingReelsList } from "./Pages/trendingreellist";
 import { Users } from "./Pages/Users";
 import { LiveMeetEntry } from "./Pages/live meet/Livemeetpages/LiveMeetEntry";
 import { LiveMeetRoom } from "./Pages/live meet/Livemeetpages/LiveMeetRoom";
+import { AnimeHome } from "./Pages/Anime/AnimeHome";
+import { SeriesDetail } from "./Pages/Anime/SeriesDetail";
+import { Watch } from "./Pages/Anime/Watch";
+import { Upload } from "./Pages/Anime/Upload";
+import { AdminPanel } from "./Pages/Anime/AdminPanel";
+import { UserRoom } from "./Pages/Anime/UserRoom";
+import { AnimeProvider } from "./context/AnimeContext";
 import "./index.css";
 import { getFcmToken } from "./firebase/useFcmToken";
 
@@ -36,6 +44,7 @@ const App = () => {
         <LiveMeetSocketProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route
               path="/"
               element={
@@ -54,6 +63,35 @@ const App = () => {
                   </RoleRoute>
                 }
               />
+              <Route element={<AnimeProvider><Outlet /></AnimeProvider>}>
+                <Route path="anime" element={<AnimeHome />} />
+                <Route path="anime/series/:id" element={<SeriesDetail />} />
+                <Route path="anime/watch/:episodeId" element={<Watch />} />
+                <Route
+                  path="anime/upload"
+                  element={
+                    <RoleRoute allowedRoles={["super_admin", "admin", "moderator", "user"]}>
+                      <Upload />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="anime/admin"
+                  element={
+                    <RoleRoute allowedRoles={["super_admin"]}>
+                      <AdminPanel />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="anime/room"
+                  element={
+                    <RoleRoute allowedRoles={["super_admin", "admin", "moderator", "user"]}>
+                      <UserRoom />
+                    </RoleRoute>
+                  }
+                />
+              </Route>
               <Route
                 path="category"
                 element={

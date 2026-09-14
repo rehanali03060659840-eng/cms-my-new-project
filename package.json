@@ -1,0 +1,31 @@
+{
+  "name": "ai-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Platform monorepo — backend (NestJS) + frontend (React/Vite)",
+  "workspaces": [
+    "my-backend",
+    "my-app"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run start:dev --workspace=my-backend\" \"npm run dev --workspace=my-app\"",
+    "dev:backend": "npm run start:dev --workspace=my-backend",
+    "dev:frontend": "npm run dev --workspace=my-app",
+    "build": "npm run build --workspace=my-backend && npm run build --workspace=my-app",
+    "build:backend": "npm run build --workspace=my-backend",
+    "build:frontend": "npm run build --workspace=my-app",
+    "lint": "npm run lint --workspace=my-app",
+    "typecheck": "npm run lint --workspace=my-app"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "browserslist": "^4.28.9",
+    "caniuse-lite": "^1.0.30001810",
+    "concurrently": "^9.0.0",
+    "firebase": "^12.18.0"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "vite": "^8.2.2"
+  }
+}

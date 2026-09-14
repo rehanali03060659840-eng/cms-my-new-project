@@ -22,6 +22,13 @@ type AuthContextType = {
   ) => void;
 
   logout: () => void;
+
+  register: (data: {
+    name: string;
+    username: string;
+    email: string;
+    password: string;
+  }) => Promise<void>;
 };
 
 const AuthContext =
@@ -68,6 +75,30 @@ export const AuthProvider = ({
 
     setToken(newToken);
     setUser(newUser);
+  };
+
+  const register = async (data: {
+    name: string;
+    username: string;
+    email: string;
+    password: string;
+  }) => {
+    const res = await axios.post(
+      "http://localhost:3000/auth/register",
+      data,
+    );
+
+    const newUser: User = {
+      _id: res.data.id,
+      name: res.data.name,
+      username: res.data.username,
+      email: res.data.email,
+      image: res.data.image || null,
+      role: res.data.role,
+      isActive: res.data.isActive,
+    };
+
+    login(res.data.token || "", newUser);
   };
 
   const logout = () => {
@@ -122,6 +153,7 @@ export const AuthProvider = ({
         loading,
         login,
         logout,
+        register,
       }}
     >
       {children}

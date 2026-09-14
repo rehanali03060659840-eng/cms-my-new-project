@@ -1,4 +1,3 @@
-// src/firebase/firebase.config.ts
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 
 export function initializeFirebase(): App {

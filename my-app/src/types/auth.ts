@@ -27,3 +27,10 @@ export interface LoginResponse {
 
   user: User;
 }
+
+export interface RegisterData {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+}

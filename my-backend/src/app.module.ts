@@ -28,16 +28,18 @@ import { UsersModule } from './users/users.module';
 import { SeedModule } from './seed/seed.module';
 import { LiveMeetModule } from './live-meet/live-meet.module';
 import { AnimeModule } from './anime/anime.module';
-
+import { ConfigService } from '@nestjs/config';
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      // envFilePath: '.env',
     }),
     CategoryModule,
     UsersModule,
-    MongooseModule.forRoot(process.env.MONGO_URI as string),
+    MongooseModule.forRoot(
+      'mongodb+srv://rehanali03060659840_db_user:Saify786@cluster0.oaqiruq.mongodb.net/LiveMeet?retryWrites=true&w=majority&appName=Cluster0',
+    ),
     AuthModule,
     IndexModule,
     UploadModule,

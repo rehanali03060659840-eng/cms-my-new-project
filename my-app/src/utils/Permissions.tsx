@@ -38,6 +38,22 @@ export const permissions = {
     "moderator",
     "user",
   ],
+
+  anime: [
+    "super_admin",
+    "admin",
+    "moderator",
+    "user",
+  ],
+
+  animeUpload: [
+    "super_admin",
+    "admin",
+  ],
+
+  animeAdmin: [
+    "super_admin",
+  ],
 } as const;
 
 export const hasPermission = (
