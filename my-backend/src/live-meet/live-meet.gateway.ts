@@ -305,9 +305,7 @@ export class LiveMeetGateway implements OnGatewayConnection {
     if (!p) return;
     p.micLocked = false;
     for (const sid of p.socketIds)
-      this.server
-        .to(sid)
-        .emit('meeting:mic-unlocked', { userId: body.userId });
+      this.server.to(sid).emit('meeting:mic-unlocked', { userId: body.userId });
     this.server
       .to(this.room(m._id))
       .emit('meeting:participants', this.participants(m));

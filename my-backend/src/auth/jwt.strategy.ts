@@ -1,31 +1,18 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 
-import {
-  PassportStrategy,
-} from "@nestjs/passport";
+import { PassportStrategy } from '@nestjs/passport';
 
-import {
-  ExtractJwt,
-  Strategy,
-} from "passport-jwt";
+import { ExtractJwt, Strategy } from 'passport-jwt';
 
-import { jwtConstants } from "./constants";
+import { jwtConstants } from './constants';
 
-import { UsersService } from "../users/users.service";
+import { UsersService } from '../users/users.service';
 
 @Injectable()
-export class JwtStrategy
-  extends PassportStrategy(Strategy)
-{
-  constructor(
-    private readonly usersService: UsersService,
-  ) {
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(private readonly usersService: UsersService) {
     super({
-      jwtFromRequest:
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
 
       ignoreExpiration: false,
 
@@ -33,24 +20,15 @@ export class JwtStrategy
     });
   }
 
-  async validate(payload: {
-    sub: string;
-  }) {
-    const user =
-      await this.usersService.findById(
-        payload.sub,
-      );
+  async validate(payload: { sub: string }) {
+    const user = await this.usersService.findById(payload.sub);
 
     if (!user) {
-      throw new UnauthorizedException(
-        "User no longer exists",
-      );
+      throw new UnauthorizedException('User no longer exists');
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException(
-        "User account is disabled",
-      );
+      throw new UnauthorizedException('User account is disabled');
     }
 
     return {

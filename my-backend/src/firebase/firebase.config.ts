@@ -6,13 +6,25 @@ export function initializeFirebase(): App {
     return apps[0];
   }
 
-  const keyPath = process.env.FIREBASE_KEY_PATH;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
 
-  if (!keyPath) {
-    throw new Error('FIREBASE_KEY_PATH is not set in .env file');
+  if (!privateKey || !clientEmail || !projectId) {
+    console.warn(
+      'Firebase credentials not fully configured (FIREBASE_PRIVATE_KEY/CLIENT_EMAIL/PROJECT_ID). Skipping initialization.',
+    );
+    return null as unknown as App;
   }
 
+  // Replace escaped newlines from env vars
+  const formattedKey = privateKey.replace(/\\n/g, '\n');
+
   return initializeApp({
-    credential: cert(keyPath), // seedha file path — koi manual copy-paste nahi
+    credential: cert({
+      privateKey: formattedKey,
+      clientEmail,
+      projectId,
+    }),
   });
 }

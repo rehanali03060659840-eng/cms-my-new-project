@@ -9,36 +9,28 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-} from "@nestjs/common";
+} from '@nestjs/common';
 
-import {
-  FileInterceptor,
-} from "@nestjs/platform-express";
+import { FileInterceptor } from '@nestjs/platform-express';
 
-import {
-  diskStorage,
-} from "multer";
+import { diskStorage } from 'multer';
 
-import {
-  extname,
-} from "path";
+import { extname, join } from 'path';
 
-import { mkdirSync } from "fs";
+import { mkdirSync } from 'fs';
 
-import { UsersService } from "./users.service";
+import { UsersService } from './users.service';
 
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { RolesGuard } from "../auth/roles.guard";
-import { Roles } from "../auth/roles.decorator";
-import { Role } from "../auth/roles.enum";
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '../auth/roles.enum';
 
-@Controller("users")
+@Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Get()
   findAll() {
@@ -47,21 +39,24 @@ export class UsersController {
 
   @Post()
   @UseInterceptors(
-    FileInterceptor("image", {
+    FileInterceptor('image', {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const uploadPath = "./uploads/users";
+          const uploadBase = process.env.UPLOAD_DIR || process.cwd();
+          const uploadPath = join(uploadBase, 'uploads', 'users');
 
-          mkdirSync(uploadPath, {
-            recursive: true,
-          });
-
-          cb(null, uploadPath);
+          try {
+            mkdirSync(uploadPath, {
+              recursive: true,
+            });
+            cb(null, uploadPath);
+          } catch (err) {
+            cb(err as Error, uploadPath);
+          }
         },
 
         filename: (req, file, cb) => {
-          const uniqueName =
-            `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
+          const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
 
           cb(null, uniqueName);
         },
@@ -83,36 +78,27 @@ export class UsersController {
   ) {
     return this.usersService.createUser({
       ...body,
-      image: image
-        ? `/uploads/users/${image.filename}`
-        : undefined,
+      image: image ? `/uploads/users/${image.filename}` : undefined,
     });
   }
 
-  @Patch(":id/role")
+  @Patch(':id/role')
   updateRole(
-    @Param("id") id: string,
+    @Param('id') id: string,
 
-    @Body("role")
+    @Body('role')
     role: Role,
   ) {
-    return this.usersService.updateRole(
-      id,
-      role,
-    );
+    return this.usersService.updateRole(id, role);
   }
 
-  @Patch(":id/status")
-  toggleStatus(
-    @Param("id") id: string,
-  ) {
+  @Patch(':id/status')
+  toggleStatus(@Param('id') id: string) {
     return this.usersService.toggleStatus(id);
   }
 
-  @Delete(":id")
-  remove(
-    @Param("id") id: string,
-  ) {
+  @Delete(':id')
+  remove(@Param('id') id: string) {
     return this.usersService.removeUser(id);
   }
 }

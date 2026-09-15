@@ -12,7 +12,7 @@ import {
 } from './schemas/meeting-history.schema';
 
 import { AuthModule } from '../auth/auth.module';
-import { UsersModule } from "../users/users.module";
+import { UsersModule } from '../users/users.module';
 @Module({
   imports: [
     AuthModule,
@@ -31,13 +31,8 @@ import { UsersModule } from "../users/users.module";
 
   controllers: [LiveMeetController],
 
-  providers: [
-    LiveMeetGateway,
-    LiveMeetService,
-  ],
+  providers: [LiveMeetGateway, LiveMeetService],
 
-  exports: [
-    LiveMeetService,
-  ],
+  exports: [LiveMeetService],
 })
 export class LiveMeetModule {}

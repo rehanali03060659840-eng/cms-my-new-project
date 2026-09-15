@@ -12,8 +12,8 @@ export class LiveChat {
   @Prop({ required: true }) senderId!: string;
   @Prop({ required: true }) senderName!: string;
   @Prop({ required: true }) text!: string;
-   @Prop({ default: false }) isEdited!: boolean;
-   @Prop({ default: false }) isDeleted!: boolean;
-   @Prop({ type: String, default: null }) replyTo!: string | null;
+  @Prop({ default: false }) isEdited!: boolean;
+  @Prop({ default: false }) isDeleted!: boolean;
+  @Prop({ type: String, default: null }) replyTo!: string | null;
 }
 export const LiveChatSchema = SchemaFactory.createForClass(LiveChat);

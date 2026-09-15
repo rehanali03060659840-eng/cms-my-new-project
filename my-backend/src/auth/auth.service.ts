@@ -2,13 +2,13 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
-} from "@nestjs/common";
+} from '@nestjs/common';
 
-import { JwtService } from "@nestjs/jwt";
+import { JwtService } from '@nestjs/jwt';
 
-import * as bcrypt from "bcryptjs";
-import { UsersService } from "../users/users.service";
-import { Role } from "./roles.enum";
+import * as bcrypt from 'bcryptjs';
+import { UsersService } from '../users/users.service';
+import { Role } from './roles.enum';
 
 @Injectable()
 export class AuthService {
@@ -18,43 +18,26 @@ export class AuthService {
     private readonly usersService: UsersService,
   ) {}
 
-  async login(body: {
-    email: string;
-    password: string;
-  }) {
-    const user =
-      await this.usersService.findByEmail(
-        body.email,
-      );
+  async login(body: { email: string; password: string }) {
+    const user = await this.usersService.findByEmail(body.email);
 
     if (!user) {
-      throw new UnauthorizedException(
-        "Invalid email or password",
-      );
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException(
-        "Your account has been disabled",
-      );
+      throw new UnauthorizedException('Your account has been disabled');
     }
 
-    const passwordMatch =
-      await bcrypt.compare(
-        body.password,
-        user.password,
-      );
+    const passwordMatch = await bcrypt.compare(body.password, user.password);
 
     if (!passwordMatch) {
-      throw new UnauthorizedException(
-        "Invalid email or password",
-      );
+      throw new UnauthorizedException('Invalid email or password');
     }
 
-    const token =
-      await this.jwtService.signAsync({
-        sub: user._id.toString(),
-      });
+    const token = await this.jwtService.signAsync({
+      sub: user._id.toString(),
+    });
 
     return {
       token,
@@ -71,7 +54,12 @@ export class AuthService {
     };
   }
 
-  async register(data: { name: string; username: string; email: string; password: string }) {
+  async register(data: {
+    name: string;
+    username: string;
+    email: string;
+    password: string;
+  }) {
     const existingUser = await this.usersService.findByEmail(data.email);
     if (existingUser) {
       throw new ConflictException('Email already exists');

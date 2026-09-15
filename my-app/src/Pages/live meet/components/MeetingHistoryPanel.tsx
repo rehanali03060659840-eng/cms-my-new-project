@@ -42,18 +42,18 @@ export const MeetingHistoryPanel = ({
       />
       {/* drawer */}
       <aside
-        className={`fixed right-0 top-0 z-50 h-full w-full max-w-[380px] transform bg-gradient-to-br from-[#111936] to-[#27348b] shadow-2xl transition-transform duration-300 text-white ${
+        className={`fixed right-0 top-0 z-50 h-full max-h-[630px] w-full max-w-[380px] transform bg-gradient-to-br from-[#111936] to-[#27348b] shadow-2xl transition-transform duration-300 text-white rounded rounded-lg mt-2 ${
           open ? "translate-x-0 " : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b p-4">
+        <div className="flex items-center justify-between shadow-xl p-4">
           <div>
             <h2 className="font-bold">Meeting History</h2>
             <p className="text-xs text-zinc-500">Super admin only</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 hover:bg-zinc-100"
+            className="rounded-lg p-2 hover:bg-zinc-900"
           >
             <X size={18} />
           </button>
@@ -63,7 +63,7 @@ export const MeetingHistoryPanel = ({
             <p className="p-5 text-sm text-zinc-400">Loading...</p>
           ) : items.length ? (
             items.map((m) => (
-              <div key={m._id} className="mb-2 rounded-xl border p-3">
+              <div key={m._id} className="mb-2 rounded-xl shadow-xl p-3">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold">{m.title}</p>

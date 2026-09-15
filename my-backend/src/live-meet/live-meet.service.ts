@@ -29,8 +29,7 @@ export type Participant = {
   isHost: boolean;
   muted: boolean;
   cameraOff: boolean;
-  micLocked:boolean;
-
+  micLocked: boolean;
 };
 
 export type ActiveMeeting = {

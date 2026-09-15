@@ -1,23 +1,13 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { CgMenuGridR, CgLogOut } from "react-icons/cg";
 import { useAuth } from "../context/AuthContext";
-import { RiDashboardFill } from "react-icons/ri";
-import { BiCategory } from "react-icons/bi";
-import { FilePenLine, Video } from "lucide-react";
-import { FaWpforms } from "react-icons/fa";
+
+import { Video } from "lucide-react";
 import { FiUsers } from "react-icons/fi";
-import { useState } from "react";
-import { GoChevronDown } from "react-icons/go";
-import { BsCameraReels } from "react-icons/bs";
-import { hasPermission } from "../utils/Permissions";
-import { Tv, Upload, Shield, UserRound } from "lucide-react";
 
 export const Sidebar = () => {
   const { logout, user } = useAuth();
-  const location = useLocation();
-  const [isSettingOpen, setIsSettingOpen] = useState(
-    location.pathname.startsWith("/setting"),
-  );
+  
   const linkStyles = ({ isActive }: { isActive: boolean }) =>
     `group flex items-center rounded-md px-3 py-2.5 text-[12px] font-medium transition-all duration-200 ${isActive ? "bg-gradient-to-r from-[#4F46E5] to-[#6366F1] text-white shadow-md shadow-indigo-500/20" : "text-white/75 hover:bg-white/[0.07] hover:text-white"}`;
   return (
@@ -57,66 +47,7 @@ export const Sidebar = () => {
         </div>
       </div>
       <nav className="relative z-10 mt-5 flex flex-1 flex-col gap-1.5 overflow-y-auto px-2">
-        {hasPermission(user?.role!, "dashboard") && (
-          <NavLink to="/" className={linkStyles}>
-            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <RiDashboardFill />
-            </div>
-            <span>Dashboard</span>
-          </NavLink>
-        )}
-        {hasPermission(user?.role!, "category") && (
-          <NavLink to="/category" className={linkStyles}>
-            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <BiCategory />
-            </div>
-            <span>Category</span>
-          </NavLink>
-        )}
-        {hasPermission(user?.role!, "blog") && (
-          <NavLink to="/blogs" className={linkStyles}>
-            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <FilePenLine />
-            </div>
-            <span>Blog</span>
-          </NavLink>
-        )}
-        <NavLink to="/anime" className={linkStyles}>
-          <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-            <Tv />
-          </div>
-          <span>Anime</span>
-        </NavLink>
-        <NavLink to="/anime/room" className={linkStyles}>
-          <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-            <UserRound />
-          </div>
-          <span>My Room</span>
-        </NavLink>
-        {(user?.role === "super_admin" || user?.role === "admin") && (
-          <NavLink to="/anime/upload" className={linkStyles}>
-            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <Upload />
-            </div>
-            <span>Upload</span>
-          </NavLink>
-        )}
-        {user?.role === "super_admin" && (
-          <NavLink to="/anime/admin" className={linkStyles}>
-            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <Shield />
-            </div>
-            <span>Anime Admin</span>
-          </NavLink>
-        )}
-        {hasPermission(user?.role!, "reels") && (
-          <NavLink to="/trendingreelslist" className={linkStyles}>
-            <div className="mr-2.5 flex w-4 justify-center text-[16px]">
-              <BsCameraReels />
-            </div>
-            <span>Reels</span>
-          </NavLink>
-        )}
+        
         <NavLink to="/live-meet" className={linkStyles}>
           <div className="mr-2.5 flex w-4 justify-center text-[16px]">
             <Video />
@@ -131,44 +62,7 @@ export const Sidebar = () => {
             <span>Users</span>
           </NavLink>
         )}
-        {hasPermission(user?.role!, "setting") && (
-          <div className="flex w-full flex-col gap-1">
-            <button
-              onClick={() => setIsSettingOpen((v) => !v)}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-[12px] font-medium transition-all duration-200 ${location.pathname.startsWith("/setting") ? "bg-gradient-to-r from-[#4F46E5] to-[#6366F1] text-white shadow-md shadow-indigo-500/20" : "text-white/75 hover:bg-white/[0.07] hover:text-white"}`}
-            >
-              <div className="flex items-center">
-                <div className="mr-2.5 flex w-4 justify-center text-[15px]">
-                  <FaWpforms />
-                </div>
-                <span>Setting</span>
-              </div>
-              <GoChevronDown
-                className={`text-[14px] transition-transform ${isSettingOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            {isSettingOpen && (
-              <div className="ml-3 mt-1 flex flex-col gap-1 border-l border-white/10 pl-2">
-                <NavLink
-                  to="/setting/privacy-and-policy"
-                  className={({ isActive }) =>
-                    `rounded-md px-2 py-2 text-[10px] ${isActive ? "bg-white/10 font-medium text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white"}`
-                  }
-                >
-                  Privacy & Policy
-                </NavLink>
-                <NavLink
-                  to="/setting/terms-and-conditions"
-                  className={({ isActive }) =>
-                    `rounded-md px-2 py-2 text-[10px] ${isActive ? "bg-white/10 font-medium text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white"}`
-                  }
-                >
-                  Terms & Conditions
-                </NavLink>
-              </div>
-            )}
-          </div>
-        )}
+       
       </nav>
       <div className="relative z-10 mt-auto border-t border-white/5 p-2">
         <button
