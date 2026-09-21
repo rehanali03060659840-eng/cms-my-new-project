@@ -8,6 +8,18 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Handle OPTIONS preflight requests immediately to prevent 504 Gateway Timeout
+  app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // Resolve uploads directory from env or fall back to CWD (cloud-safe)
   const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
   try {

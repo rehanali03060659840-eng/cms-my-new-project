@@ -25,6 +25,11 @@ import { ConfigService } from '@nestjs/config';
             'MONGO_URL environment variable is required but was not set',
           );
         })(),
+      {
+        serverSelectionTimeoutMS: 5000, // Crash quickly if DB is down instead of timing out the proxy
+        socketTimeoutMS: 45000, // Close idle sockets after 45s
+        maxPoolSize: 10, // Limit connection pool size
+      },
     ),
     AuthModule,
     // UsersModule,
