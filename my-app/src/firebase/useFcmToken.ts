@@ -8,7 +8,7 @@ export async function getFcmToken(): Promise<string | null> {
     const permission = await Notification.requestPermission();
 
     if (permission !== "granted") {
-      console.log("User ne notification permission deny ki");
+      console.log("User deny notification permission");
       return null;
     }
 
@@ -18,7 +18,7 @@ export async function getFcmToken(): Promise<string | null> {
       console.log("✅ FCM Token:", token);
       return token;
     } else {
-      console.log("Token generate nahi hua");
+      console.log("Token generate error");
       return null;
     }
   } catch (error) {

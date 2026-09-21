@@ -36,7 +36,10 @@ export const LiveMeetSocketProvider = ({
     }
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
+      withCredentials: true,
+      secure: true,
+      rejectUnauthorized: false,
     });
     socketRef.current = socket;
     socket.on("connect", () => setConnected(true));
