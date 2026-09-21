@@ -13,12 +13,21 @@ import { LiveMeetService, UserInfo } from './live-meet.service';
 
 @WebSocketGateway({
   namespace: '/live-meet',
-  cors: { origin: true, credentials: true },
+  transports: ['polling', 'websocket'], 
+  cors: {
+    origin: [
+      'https://web.app',
+      'https://web.app',
+      'http://localhost:5173'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST']
+  },
 })
 export class LiveMeetGateway implements OnGatewayConnection {
   @WebSocketServer() server!: Server;
   constructor(
-    private readonly service: LiveMeetService,
+    private readonly service: LiveMeetService, 
     private readonly jwt: JwtService,
   ) {}
 
