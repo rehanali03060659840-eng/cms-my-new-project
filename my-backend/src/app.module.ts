@@ -26,7 +26,8 @@ import { ConfigService } from '@nestjs/config';
           );
         })(),
       {
-        serverSelectionTimeoutMS: 5000, // Crash quickly if DB is down instead of timing out the proxy
+        serverSelectionTimeoutMS: 5000, // Max 5 seconds to find DB server
+        connectTimeoutMS: 10000, // Max 10 seconds to connect
         socketTimeoutMS: 45000, // Close idle sockets after 45s
         maxPoolSize: 10, // Limit connection pool size
       },
