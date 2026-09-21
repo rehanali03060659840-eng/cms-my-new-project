@@ -469,8 +469,8 @@ export function useMeshCall(
 
   const cleanupAll = useCallback(() => {
     isCleaningUp.current = true;
-    screenTrackRef.current?.stop();
-    localStream?.getTracks().forEach((t) => t.stop());
+    stopLocalCameraAndMic(localStream);
+    stopLocalCameraAndMic(screenStream);
     peers.current.forEach(({ pc }) => pc.close());
     peers.current.clear();
     localVideoTrackRef.current = null;
@@ -480,7 +480,18 @@ export function useMeshCall(
     setLocalStream(null);
     setScreenStream(null);
     setScreenSharing(false);
-  }, [localStream]);
+  }, [localStream, screenStream]);
+
+  // Explicit helper to stop all tracks on a MediaStream
+  // Ensures camera light turns off immediately on call end/leave
+  const stopLocalCameraAndMic = useCallback((stream: MediaStream | null) => {
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        track.stop();
+        console.log(`Stopped track: ${track.kind}`);
+      });
+    }
+  }, []);
 
   return {
     localStream,
@@ -502,5 +513,6 @@ export function useMeshCall(
     forceUnmuteSelf,
     unlockMic,
     cleanupAll,
+    stopLocalCameraAndMic,
   };
 }

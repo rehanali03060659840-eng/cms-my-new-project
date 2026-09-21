@@ -21,13 +21,13 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin || /https?:\/\/.*(-meet-|\.web\.app|\.firebaseapp\.com|localhost:)/.test(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: [
+      'https://live-meet-ff137.web.app',
+      'https://live-meet-ffc37.web.app',
+      'https://ff137.web.app',
+      'https://ffc37.web.app',
+      'http://localhost:5173'
+    ],
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization',
