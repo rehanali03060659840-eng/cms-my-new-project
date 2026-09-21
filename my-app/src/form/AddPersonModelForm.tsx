@@ -66,7 +66,7 @@ export const AddUserModal = ({
       if (image) formData.append("image", image);
 
       const res = await axios.post<User>(
-        "http://localhost:3000/users",
+        `${import.meta.env.VITE_API_URL}/users`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } },
       );

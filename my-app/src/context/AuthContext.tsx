@@ -84,7 +84,7 @@ export const AuthProvider = ({
     password: string;
   }) => {
     const res = await axios.post(
-      "http://localhost:3000/auth/register",
+      `${import.meta.env.VITE_API_URL}/auth/register`,
       data,
     );
 
@@ -121,7 +121,7 @@ export const AuthProvider = ({
 
       try {
         const res = await axios.get<User>(
-          "http://localhost:3000/auth/me",
+          `${import.meta.env.VITE_API_URL}/auth/me`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

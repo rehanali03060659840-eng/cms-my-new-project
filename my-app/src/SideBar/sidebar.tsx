@@ -18,7 +18,7 @@ export const Sidebar = () => {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-500 text-sm font-bold">
               {user.image ? (
                 <img
-                  src={`http://localhost:3000${user.image}`}
+                  src={`${import.meta.env.VITE_API_URL}${user.image}`}
                   alt={user.name}
                   className="h-full w-full object-cover"
                 />

@@ -9,7 +9,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
-const SOCKET_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/live-meet`;
+const SOCKET_URL = `${import.meta.env.VITE_API_URL ?? ""}/live-meet`;
 interface LiveMeetSocketCtx {
   socket: Socket | null;
   connected: boolean;

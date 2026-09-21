@@ -30,7 +30,7 @@ export const Users = () => {
     try {
       setLoading(true);
       const res = await axios.get<User[]>(
-        "http://localhost:3000/users",
+        `${import.meta.env.VITE_API_URL}/users`,
         authHeader,
       );
       setUsers(res.data);
@@ -53,7 +53,7 @@ export const Users = () => {
 
     try {
       await axios.patch(
-        `http://localhost:3000/users/${id}/role`,
+        `${import.meta.env.VITE_API_URL}/users/${id}/role`,
         { role: newRole },
         authHeader,
       );
@@ -67,7 +67,7 @@ export const Users = () => {
   const toggleStatus = async (id: string) => {
     try {
       await axios.patch(
-        `http://localhost:3000/users/${id}/status`,
+        `${import.meta.env.VITE_API_URL}/users/${id}/status`,
         {},
         authHeader,
       );
@@ -87,7 +87,7 @@ export const Users = () => {
     if (!confirmed) return;
 
     try {
-      await axios.delete(`http://localhost:3000/users/${id}`, authHeader);
+      await axios.delete(`${import.meta.env.VITE_API_URL}/users/${id}`, authHeader);
       setUsers((prev) => prev.filter((u) => u._id !== id));
       toast.success("User removed successfully");
     } catch {
@@ -150,7 +150,7 @@ export const Users = () => {
                     <div className="flex items-center gap-3">
                       {user.image ? (
                         <img
-                          src={`http://localhost:3000${user.image}`}
+                          src={`${import.meta.env.VITE_API_URL}${user.image}`}
                           alt={user.name}
                           className="h-9 w-9 rounded-full object-cover ring-1 ring-zinc-200"
                         />
