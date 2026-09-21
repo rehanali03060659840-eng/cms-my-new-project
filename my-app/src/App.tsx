@@ -38,18 +38,11 @@ const App = () => {
                 </ProtectedRoute>
               }
             >
-              
-                {/* <Route
-                  path="anime/admin"
-                  element={
-                    <RoleRoute allowedRoles={["super_admin"]}>
-                      <AdminPanel />
-                    </RoleRoute>
-                  }
-                /> */}
-                
-              
-              <Route index
+              <Route index element={<LiveMeetEntry />} />
+
+              <Route path="live-meet" element={<LiveMeetEntry />} />
+              <Route
+                index
                 path="users"
                 element={
                   <RoleRoute allowedRoles={["super_admin"]}>
@@ -57,8 +50,8 @@ const App = () => {
                   </RoleRoute>
                 }
               />
-              
-              <Route path="live-meet" element={<LiveMeetEntry />} />
+
+              {/* <Route path="live-meet" element={<LiveMeetEntry />} /> */}
               <Route
                 path="live-meet/room/:meetingId"
                 element={<LiveMeetRoom />}

@@ -48,7 +48,7 @@ export const Sidebar = () => {
       </div>
       <nav className="relative z-10 mt-5 flex flex-1 flex-col gap-1.5 overflow-y-auto px-2">
         
-        <NavLink to="/live-meet" className={linkStyles}>
+        <NavLink to="/" className={linkStyles}>
           <div className="mr-2.5 flex w-4 justify-center text-[16px]">
             <Video />
           </div>
@@ -58,7 +58,7 @@ export const Sidebar = () => {
           <NavLink to="/users" className={linkStyles}>
             <div className="mr-2.5 flex w-4 justify-center text-[16px]">
               <FiUsers />
-            </div>
+            </div> 
             <span>Users</span>
           </NavLink>
         )}
