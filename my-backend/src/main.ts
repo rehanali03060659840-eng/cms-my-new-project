@@ -21,8 +21,16 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: (origin, callback) => {
+      if (!origin || /https?:\/\/.*(-meet-|\.web\.app|\.firebaseapp\.com|localhost:)/.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   app.use(json({ limit: '100mb' }));
