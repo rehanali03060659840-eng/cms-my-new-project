@@ -38,8 +38,8 @@ export const LiveMeetSocketProvider = ({
       auth: { token },
       transports: ["polling", "websocket"],
       withCredentials: true,
-      secure: true,
-      rejectUnauthorized: false,
+      upgrade: true,
+      rememberUpgrade: true,
     });
     socketRef.current = socket;
     socket.on("connect", () => setConnected(true));

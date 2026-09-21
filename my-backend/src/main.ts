@@ -40,6 +40,11 @@ async function bootstrap() {
 
   await app.listen(port, '0.0.0.0');
 
+  // Keep-alive & timeout tweaks to prevent proxy drops (QUIC/HTTP2)
+  const server = app.getHttpServer();
+  server.keepAliveTimeout = 65000; // 65 seconds
+  server.headersTimeout = 66000;
+
   console.log(`Backend running on port ${port}`);
 }
 

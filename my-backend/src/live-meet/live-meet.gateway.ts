@@ -14,14 +14,10 @@ import { LiveMeetService, UserInfo } from './live-meet.service';
 @WebSocketGateway({
   namespace: '/live-meet',
   transports: ['polling', 'websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || /https?:\/\/.*(-meet-|\.web\.app|\.firebaseapp\.com|localhost:)/.test(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true,
     credentials: true,
   },
 })
