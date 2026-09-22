@@ -39,7 +39,7 @@ export const LiveMeetSocketProvider = ({
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       withCredentials: true,
       autoConnect: true,
       reconnection: true,
