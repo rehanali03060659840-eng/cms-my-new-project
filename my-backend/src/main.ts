@@ -6,7 +6,11 @@ import { mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug'],
+  });
+
+  const port = Number(process.env.PORT) || 3000;
 
   const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
   try {
@@ -30,8 +34,6 @@ async function bootstrap() {
 
   app.use(json({ limit: '100mb' }));
   app.use(urlencoded({ extended: true, limit: '100mb' }));
-
-  const port = Number(process.env.PORT) || 3000;
 
   await app.listen(port, '0.0.0.0');
 
