@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 
-import axios from "axios";
+import client from "../api/client";
 
 import type { User } from "../types/auth";
 
@@ -83,8 +83,8 @@ export const AuthProvider = ({
     email: string;
     password: string;
   }) => {
-    const res = await axios.post(
-      `${import.meta.env.VITE_API_URL}/auth/register`,
+    const res = await client.post(
+      `/auth/register`,
       data,
     );
 
@@ -120,8 +120,8 @@ export const AuthProvider = ({
       }
 
       try {
-        const res = await axios.get<User>(
-          `${import.meta.env.VITE_API_URL}/auth/me`,
+        const res = await client.get<User>(
+          `/auth/me`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

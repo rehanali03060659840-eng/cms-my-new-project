@@ -14,6 +14,11 @@ interface PeerConnectionState {
   negotiationNeeded: boolean;
 }
 
+interface SenderEntry {
+  sender: RTCRtpSender;
+  track: MediaStreamTrack;
+}
+
 export function useMeshCall(
   socket: Socket | null,
   meetingId: string,
@@ -34,91 +39,9 @@ export function useMeshCall(
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
   const isCleaningUp = useRef(false);
-
-  const requestMedia = useCallback(async () => {
-    setRequestingMedia(true);
-    setPermissionError(null);
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-      if (!isCleaningUp.current) {
-        setLocalStream(s);
-        setMicOn(true);
-        setCameraOn(true);
-        cacheLocalTracks(s);
-      } else {
-        s.getTracks().forEach((t) => t.stop());
-      }
-    } catch (e: any) {
-      if (!isCleaningUp.current) {
-        setLocalStream(null);
-        setPermissionError(
-          e?.name === "NotAllowedError"
-            ? "Camera & microphone access was blocked. Allow access from your browser's site settings and try again."
-            : "Couldn't access camera or microphone.",
-        );
-      }
-    } finally {
-      if (!isCleaningUp.current) setRequestingMedia(false);
-    }
-  }, []);
-
-  const cacheLocalTracks = useCallback((stream: MediaStream) => {
-    const videoTrack = stream.getVideoTracks()[0] ?? null;
-    const audioTrack = stream.getAudioTracks()[0] ?? null;
-    localVideoTrackRef.current = videoTrack;
-    localAudioTrackRef.current = audioTrack;
-  }, []);
-
-  useEffect(() => {
-    isCleaningUp.current = false;
-    let alive = true;
-    (async () => {
-      setRequestingMedia(true);
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        if (alive && !isCleaningUp.current) {
-          setLocalStream(s);
-          setPermissionError(null);
-          cacheLocalTracks(s);
-        } else {
-          s.getTracks().forEach((t) => t.stop());
-        }
-      } catch (e: any) {
-        if (alive && !isCleaningUp.current) {
-          setPermissionError(
-            e?.name === "NotAllowedError"
-              ? "Camera & microphone access was blocked. Allow access from your browser's site settings and try again."
-              : "Couldn't access camera or microphone.",
-          );
-        }
-      } finally {
-        if (alive && !isCleaningUp.current) setRequestingMedia(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [cacheLocalTracks]);
-
-  useEffect(() => {
-    if (!localStream) return;
-    peers.current.forEach(({ pc }) => {
-      const existingTrackIds = new Set(
-        pc.getSenders().map((s) => s.track?.id).filter(Boolean),
-      );
-      localStream.getTracks().forEach((track) => {
-        if (!existingTrackIds.has(track.id)) {
-          pc.addTrack(track, localStream);
-        }
-      });
-    });
-  }, [localStream]);
+  const audioSenders = useRef<Map<string, SenderEntry>>(new Map());
+  const videoSenders = useRef<Map<string, SenderEntry>>(new Map());
+  const renegotiationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const safeSetLocalDescription = useCallback(
     async (pc: RTCPeerConnection, description: RTCSessionDescriptionInit) => {
@@ -147,6 +70,55 @@ export function useMeshCall(
     [],
   );
 
+  const scheduleRenegotiation = useCallback(
+    (targetUserId: string) => {
+      if (renegotiationTimer.current) {
+        clearTimeout(renegotiationTimer.current);
+      }
+      renegotiationTimer.current = setTimeout(async () => {
+        renegotiationTimer.current = null;
+        const state = peers.current.get(targetUserId);
+        if (!state) return;
+        const { pc } = state;
+        if (pc.signalingState !== "stable") {
+          state.negotiationNeeded = true;
+          return;
+        }
+        state.offerInFlight = true;
+        state.negotiationNeeded = false;
+        try {
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          });
+          const success = await safeSetLocalDescription(pc, offer);
+          if (success) {
+            socket?.emit("webrtc:signal", {
+              meetingId,
+              toUserId: targetUserId,
+              data: { sdp: offer },
+            });
+          }
+        } catch (err) {
+          console.error("Renegotiation error:", err);
+        } finally {
+          const updatedState = peers.current.get(targetUserId);
+          if (updatedState) {
+            updatedState.offerInFlight = false;
+            if (
+              updatedState.negotiationNeeded &&
+              pc.signalingState === "stable"
+            ) {
+              updatedState.negotiationNeeded = false;
+              pc.dispatchEvent(new Event("negotiationneeded"));
+            }
+          }
+        }
+      }, 50);
+    },
+    [safeSetLocalDescription, socket, meetingId],
+  );
+
   const createPeer = useCallback(
     (targetUserId: string, isInitiator: boolean): RTCPeerConnection | null => {
       if (!socket || targetUserId === myUserId) return null;
@@ -165,7 +137,16 @@ export function useMeshCall(
       peers.current.set(targetUserId, peerState);
 
       if (localStream) {
-        localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+        const audioTracks = localStream.getAudioTracks();
+        const videoTracks = localStream.getVideoTracks();
+        audioTracks.forEach((track) => {
+          const sender = pc.addTrack(track, localStream);
+          audioSenders.current.set(track.id, { sender, track });
+        });
+        videoTracks.forEach((track) => {
+          const sender = pc.addTrack(track, localStream);
+          videoSenders.current.set(track.id, { sender, track });
+        });
       }
 
       pc.onicecandidate = (e) => {
@@ -199,17 +180,17 @@ export function useMeshCall(
       pc.onnegotiationneeded = async () => {
         const state = peers.current.get(targetUserId);
         if (!state) return;
-
         if (pc.signalingState !== "stable" || state.offerInFlight) {
           state.negotiationNeeded = true;
           return;
         }
-
         state.offerInFlight = true;
         state.negotiationNeeded = false;
-
         try {
-          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          });
           const success = await safeSetLocalDescription(pc, offer);
           if (success) {
             socket.emit("webrtc:signal", {
@@ -224,7 +205,10 @@ export function useMeshCall(
           const updatedState = peers.current.get(targetUserId);
           if (updatedState) {
             updatedState.offerInFlight = false;
-            if (updatedState.negotiationNeeded && pc.signalingState === "stable") {
+            if (
+              updatedState.negotiationNeeded &&
+              pc.signalingState === "stable"
+            ) {
               updatedState.negotiationNeeded = false;
               pc.dispatchEvent(new Event("negotiationneeded"));
             }
@@ -317,7 +301,10 @@ export function useMeshCall(
             }
           } else if (data.sdp.type === "answer") {
             state.offerInFlight = false;
-            if (state.negotiationNeeded && pc.signalingState === "stable") {
+            if (
+              state.negotiationNeeded &&
+              pc.signalingState === "stable"
+            ) {
               state.negotiationNeeded = false;
               pc.dispatchEvent(new Event("negotiationneeded"));
             }
@@ -344,40 +331,59 @@ export function useMeshCall(
     if (micLocked) return;
     setMicOn((prev) => {
       const next = !prev;
-      localStream?.getAudioTracks().forEach((t) => (t.enabled = next));
+      audioSenders.current.forEach(({ sender }) => {
+        sender
+          .setDirection(next ? "sendrecv" : "recvonly")
+          .catch((err) => {
+            console.warn("setDirection failed:", err);
+          });
+      });
       socket?.emit("meeting:mic-state", { meetingId, muted: !next });
       return next;
     });
-  }, [localStream, socket, meetingId, micLocked]);
+  }, [micLocked, socket, meetingId]);
 
   const toggleCamera = useCallback(() => {
     setCameraOn((prev) => {
       const next = !prev;
-      localStream?.getVideoTracks().forEach((t) => (t.enabled = next));
+      videoSenders.current.forEach(({ sender }) => {
+        sender
+          .setDirection(next ? "sendrecv" : "recvonly")
+          .catch((err) => {
+            console.warn("setDirection failed:", err);
+          });
+      });
       socket?.emit("meeting:camera-state", { meetingId, cameraOff: !next });
+      scheduleRenegotiation(myUserId);
       return next;
     });
-  }, [localStream, socket, meetingId]);
+  }, [socket, meetingId, scheduleRenegotiation, myUserId]);
 
   const forceMuteSelf = useCallback(
     (permanent?: boolean | string) => {
-      localStream?.getAudioTracks().forEach((t) => (t.enabled = false));
+      audioSenders.current.forEach(({ sender }) => {
+        sender.setDirection("recvonly").catch((err) => {
+          console.warn("setDirection failed:", err);
+        });
+      });
       setMicOn(false);
       if (permanent === true || permanent === "true") {
         setMicLocked(true);
       }
     },
-    [localStream],
+    [],
   );
 
   const forceUnmuteSelf = useCallback(() => {
-    localStream?.getAudioTracks().forEach((t) => {
-      t.enabled = true;
+    audioSenders.current.forEach(({ sender }) => {
+      sender.setDirection("sendrecv").catch((err) => {
+        console.warn("setDirection failed:", err);
+      });
     });
     setMicLocked(false);
     setMicOn(true);
     socket?.emit("meeting:mic-state", { meetingId, muted: false });
-  }, [localStream, socket, meetingId]);
+  }, [socket, meetingId]);
 
   const unlockMic = useCallback(() => {
     setMicLocked(false);
@@ -429,7 +435,6 @@ export function useMeshCall(
 
       const handleTrackEnded = () => {
         if (screenTrackRef.current !== track) return;
-
         const camTrack = localVideoTrackRef.current;
         replaceVideoTrackOnAllPeers(camTrack);
         setScreenStream(null);
@@ -469,29 +474,24 @@ export function useMeshCall(
 
   const cleanupAll = useCallback(() => {
     isCleaningUp.current = true;
-    stopLocalCameraAndMic(localStream);
-    stopLocalCameraAndMic(screenStream);
+    if (renegotiationTimer.current) {
+      clearTimeout(renegotiationTimer.current);
+      renegotiationTimer.current = null;
+    }
+    localStream?.getTracks().forEach((track) => track.stop());
+    screenStream?.getTracks().forEach((track) => track.stop());
     peers.current.forEach(({ pc }) => pc.close());
     peers.current.clear();
-    localVideoTrackRef.current = null;
+    audioSenders.current.clear();
+    videoSenders.current.clear();
     localAudioTrackRef.current = null;
+    localVideoTrackRef.current = null;
     screenTrackRef.current = null;
     setRemoteStreams({});
     setLocalStream(null);
     setScreenStream(null);
     setScreenSharing(false);
   }, [localStream, screenStream]);
-
-  // Explicit helper to stop all tracks on a MediaStream
-  // Ensures camera light turns off immediately on call end/leave
-  const stopLocalCameraAndMic = useCallback((stream: MediaStream | null) => {
-    if (stream) {
-      stream.getTracks().forEach((track) => {
-        track.stop();
-        console.log(`Stopped track: ${track.kind}`);
-      });
-    }
-  }, []);
 
   return {
     localStream,
@@ -513,6 +513,5 @@ export function useMeshCall(
     forceUnmuteSelf,
     unlockMic,
     cleanupAll,
-    stopLocalCameraAndMic,
   };
 }

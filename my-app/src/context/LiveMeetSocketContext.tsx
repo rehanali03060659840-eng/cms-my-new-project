@@ -9,7 +9,8 @@ import {
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
-const SOCKET_URL = `${import.meta.env.VITE_API_URL ?? ""}/live-meet`;
+const SOCKET_URL = "https://abasthan.app/live-meet";
+
 interface LiveMeetSocketCtx {
   socket: Socket | null;
   connected: boolean;
@@ -27,6 +28,7 @@ export const LiveMeetSocketProvider = ({
   const { token } = useAuth() as any;
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+
   useEffect(() => {
     if (!token) {
       socketRef.current?.disconnect();
@@ -34,13 +36,18 @@ export const LiveMeetSocketProvider = ({
       setConnected(false);
       return;
     }
+
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["polling", "websocket"],
+      transports: ["websocket"],
       withCredentials: true,
-      upgrade: true,
-      rememberUpgrade: true,
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
+
     socketRef.current = socket;
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
@@ -48,16 +55,19 @@ export const LiveMeetSocketProvider = ({
       console.error("LiveMeet socket connection error:", err),
     );
     socket.on("live-meet:error", (e) => console.error(e));
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
     };
   }, [token]);
+
   return (
     <Ctx.Provider value={{ socket: socketRef.current, connected }}>
       {children}
     </Ctx.Provider>
   );
 };
+
 export const useLiveMeetSocket = () => useContext(Ctx);

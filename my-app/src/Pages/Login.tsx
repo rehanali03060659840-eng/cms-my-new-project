@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import axios from "axios";
+import client from "../api/client";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -38,8 +38,8 @@ export const Login = () => {
       setLoading(true);
 
       const res =
-        await axios.post(
-          `${import.meta.env.VITE_API_URL}/auth/login`,
+        await client.post(
+          `/auth/login`,
           {
             email,
             password,

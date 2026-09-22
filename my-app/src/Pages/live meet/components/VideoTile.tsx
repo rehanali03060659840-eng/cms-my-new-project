@@ -51,7 +51,8 @@ export const VideoTile = ({
           autoPlay
           playsInline
           muted={local}
-          className="h-full w-full object-cover"
+          className={`h-full w-full object-cover ${local ? '-scale-x-100' : ''}`}
+          style={local ? { transform: 'scaleX(-1)' } : undefined}
         />
       ) : (
         <div className="flex h-full items-center justify-center bg-gradient-to-br from-zinc-900 to-zinc-950">
