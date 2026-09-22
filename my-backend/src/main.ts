@@ -8,19 +8,6 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Handle OPTIONS preflight requests immediately to prevent 504 Gateway Timeout
-  app.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-      res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      return res.sendStatus(200);
-    }
-    next();
-  });
-
-  // Resolve uploads directory from env or fall back to CWD (cloud-safe)
   const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
   try {
     mkdirSync(uploadDir, { recursive: true });
@@ -33,16 +20,12 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: [
-      'https://live-meet-ff137.web.app',
-      'https://live-meet-ffc37.web.app',
-      'https://ff137.web.app',
-      'https://ffc37.web.app',
-      'http://localhost:5173'
-    ],
+    origin: 'https://live-meet-ffc37.web.app',
     credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, Authorization',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   app.use(json({ limit: '100mb' }));
@@ -51,11 +34,6 @@ async function bootstrap() {
   const port = Number(process.env.PORT) || 3000;
 
   await app.listen(port, '0.0.0.0');
-
-  // Keep-alive & timeout tweaks to prevent proxy drops (QUIC/HTTP2)
-  const server = app.getHttpServer();
-  server.keepAliveTimeout = 65000; // 65 seconds
-  server.headersTimeout = 66000;
 
   console.log(`Backend running on port ${port}`);
 }

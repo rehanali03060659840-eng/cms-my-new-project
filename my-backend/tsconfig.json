@@ -17,7 +17,7 @@
     "outDir": "./dist",
     "resolveJsonModule": true,
 
-    "incremental": true,
+    "incremental": false,
     "skipLibCheck": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": false,

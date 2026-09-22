@@ -17,7 +17,7 @@ import { LiveMeetService, UserInfo } from './live-meet.service';
   pingTimeout: 60000,
   pingInterval: 25000,
   cors: {
-    origin: true,
+    origin: 'https://live-meet-ffc37.web.app',
     credentials: true,
   },
 })
