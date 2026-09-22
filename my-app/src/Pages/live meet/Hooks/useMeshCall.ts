@@ -346,6 +346,9 @@ export function useMeshCall(
   const toggleCamera = useCallback(() => {
     setCameraOn((prev) => {
       const next = !prev;
+      localStream?.getVideoTracks().forEach((track) => {
+        track.enabled = next;
+      });
       videoSenders.current.forEach(({ sender }) => {
         sender
           .setDirection(next ? "sendrecv" : "recvonly")
@@ -357,7 +360,7 @@ export function useMeshCall(
       scheduleRenegotiation(myUserId);
       return next;
     });
-  }, [socket, meetingId, scheduleRenegotiation, myUserId]);
+  }, [localStream, socket, meetingId, scheduleRenegotiation, myUserId]);
 
   const forceMuteSelf = useCallback(
     (permanent?: boolean | string) => {
