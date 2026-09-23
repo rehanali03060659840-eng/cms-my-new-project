@@ -9,7 +9,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
-const SOCKET_URL = "https://valuable-thorough-peacock.abasthan.app/live-meet";
+const SOCKET_URL = "https://abasthan.app/live-meet";
 
 interface LiveMeetSocketCtx {
   socket: Socket | null;

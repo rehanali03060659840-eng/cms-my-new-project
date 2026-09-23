@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "https://valuable-thorough-peacock.abasthan.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://abasthan.app";
 
 const client = axios.create({
   baseURL: API_URL,
