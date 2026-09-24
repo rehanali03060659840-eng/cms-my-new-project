@@ -13,7 +13,7 @@ export interface LiveMeeting {
   status: MeetingStatus;
   startedAt?: string;
   endedAt?: string;
-  durationSeconds: number;
+  durationSeconds: number; 
   peakParticipants: number;
   createdAt: string;
 }

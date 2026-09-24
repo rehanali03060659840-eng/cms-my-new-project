@@ -17,7 +17,7 @@ import {
   Shield,
   Unlock,
   UserMinus,
-  UserPlus,
+  UserPlus, 
   Users,
   Volume2,
   VolumeX,
@@ -328,7 +328,7 @@ export const LiveMeetRoom = () => {
           toast.error(response?.message || "Unable to unmute participant");
         }
       },
-    );
+    ); 
 
     setParticipants((prev) =>
       prev.map((p) =>

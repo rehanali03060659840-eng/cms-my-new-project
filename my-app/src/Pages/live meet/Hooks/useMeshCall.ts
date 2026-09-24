@@ -64,7 +64,7 @@ export function useMeshCall(
           );
           return false;
         }
-        throw err;
+        throw err; 
       }
     },
     [],
@@ -331,30 +331,19 @@ export function useMeshCall(
     if (micLocked) return;
     setMicOn((prev) => {
       const next = !prev;
-      audioSenders.current.forEach(({ sender }) => {
-        sender
-          .setDirection(next ? "sendrecv" : "recvonly")
-          .catch((err) => {
-            console.warn("setDirection failed:", err);
-          });
+      localStream?.getAudioTracks().forEach((track) => {
+        track.enabled = next;
       });
       socket?.emit("meeting:mic-state", { meetingId, muted: !next });
       return next;
     });
-  }, [micLocked, socket, meetingId]);
+  }, [micLocked, localStream, socket, meetingId]);
 
   const toggleCamera = useCallback(() => {
     setCameraOn((prev) => {
       const next = !prev;
       localStream?.getVideoTracks().forEach((track) => {
         track.enabled = next;
-      });
-      videoSenders.current.forEach(({ sender }) => {
-        sender
-          .setDirection(next ? "sendrecv" : "recvonly")
-          .catch((err) => {
-            console.warn("setDirection failed:", err);
-          });
       });
       socket?.emit("meeting:camera-state", { meetingId, cameraOff: !next });
       scheduleRenegotiation(myUserId);
@@ -364,29 +353,25 @@ export function useMeshCall(
 
   const forceMuteSelf = useCallback(
     (permanent?: boolean | string) => {
-      audioSenders.current.forEach(({ sender }) => {
-        sender.setDirection("recvonly").catch((err) => {
-          console.warn("setDirection failed:", err);
-        });
+      localStream?.getAudioTracks().forEach((track) => {
+        track.enabled = false;
       });
       setMicOn(false);
       if (permanent === true || permanent === "true") {
         setMicLocked(true);
       }
     },
-    [],
+    [localStream],
   );
 
   const forceUnmuteSelf = useCallback(() => {
-    audioSenders.current.forEach(({ sender }) => {
-      sender.setDirection("sendrecv").catch((err) => {
-        console.warn("setDirection failed:", err);
-      });
+    localStream?.getAudioTracks().forEach((track) => {
+      track.enabled = true;
     });
     setMicLocked(false);
     setMicOn(true);
     socket?.emit("meeting:mic-state", { meetingId, muted: false });
-  }, [socket, meetingId]);
+  }, [localStream, socket, meetingId]);
 
   const unlockMic = useCallback(() => {
     setMicLocked(false);
@@ -506,7 +491,6 @@ export function useMeshCall(
     screenStream,
     permissionError,
     requestingMedia,
-    requestMedia,
     connectToParticipant,
     disconnectParticipant,
     toggleMic,

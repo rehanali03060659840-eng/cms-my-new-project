@@ -75,7 +75,7 @@ export const AddUserModal = ({
       onCreated(res.data);
       handleClose();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Unable to create user");
+      toast.error(error?.response?.data?.message || "Unable to create user"); 
     } finally {
       setSubmitting(false);
     }

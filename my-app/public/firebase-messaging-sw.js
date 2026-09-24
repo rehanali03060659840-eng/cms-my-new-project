@@ -1,4 +1,3 @@
-// public/firebase-messaging-sw.js
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
@@ -14,6 +13,6 @@ apiKey: "AIzaSyBk4cXq-__9mm1CjbhYVzOuPlO_4CELNVE",
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
+messaging.onBackgroundMessage((payload) => { 
   console.log('Background message:', payload);
 });

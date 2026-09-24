@@ -11,7 +11,7 @@ import {
 import type { Socket } from "socket.io-client";
 import type { ChatMessage, ChatScope, ChatType } from "../../../types/liveMeet";
 
-const fmtTime = (iso: string) => {
+const fmtTime = (iso: string) => { 
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   const today = new Date();

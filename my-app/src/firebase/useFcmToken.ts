@@ -12,7 +12,7 @@ export async function getFcmToken(): Promise<string | null> {
       return null;
     }
 
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY }); 
 
     if (token) {
       console.log("✅ FCM Token:", token);

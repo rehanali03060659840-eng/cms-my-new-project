@@ -34,7 +34,7 @@ export const Register = () => {
       navigate("/");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Registration failed");
-    } finally {
+    } finally { 
       setLoading(false);
     }
   };

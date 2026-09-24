@@ -12,4 +12,4 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const messaging: Messaging = getMessaging(app);
+export const messaging: Messaging = getMessaging(app); 
