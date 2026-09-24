@@ -16,7 +16,7 @@ import { LiveMeetService, UserInfo } from './live-meet.service';
   transports: ['polling', 'websocket'],
   pingTimeout: 60000,
   pingInterval: 25000,
-  cors: {
+  cors: { 
     origin: 'https://live-meet-ffc37.web.app',
     credentials: true,
   },

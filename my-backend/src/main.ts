@@ -1,18 +1,11 @@
+import './preload';
+
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 import { AppModule } from './app.module';
-
-process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
-  console.error('UNHANDLED REJECTION:', reason);
-  console.error('Promise:', promise);
-});
-
-process.on('uncaughtException', (error: Error) => {
-  console.error('UNCAUGHT EXCEPTION:', error);
-});
 
 async function bootstrap() {
   try {
