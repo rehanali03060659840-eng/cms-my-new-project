@@ -15,7 +15,9 @@ async function bootstrap() {
 
     const port = Number(process.env.PORT) || 3000;
 
-    const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
+    const uploadDir =
+      process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
+
     try {
       mkdirSync(uploadDir, { recursive: true });
     } catch (err) {
@@ -27,19 +29,34 @@ async function bootstrap() {
     });
 
     app.enableCors({
-      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        const allowedOrigins = ['https://web.app', 'https://live-meet-ffc37.web.app'];
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: [
+        'https://live-meet-ffc37.web.app',
+        'https://live-meet-ffc37.firebaseapp.com',
+      ],
+
       credentials: true,
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'X-Requested-With'],
+
+      methods: [
+        'GET',
+        'HEAD',
+        'PUT',
+        'PATCH',
+        'POST',
+        'DELETE',
+        'OPTIONS',
+      ],
+
+      allowedHeaders: [
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'X-Requested-With',
+      ],
+
       exposedHeaders: ['Set-Cookie'],
+
       preflightContinue: false,
+
       optionsSuccessStatus: 204,
     });
 
