@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 
-const ICE_SERVERS = [
+const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
@@ -19,29 +19,100 @@ interface SenderEntry {
   track: MediaStreamTrack;
 }
 
+/** The shape of everything the hook exposes to its consumers. */
+export interface UseMeshCallResult {
+  localStream: MediaStream | null;
+  remoteStreams: RemoteStreams;
+  micOn: boolean;
+  cameraOn: boolean;
+  micLocked: boolean;
+  screenSharing: boolean;
+  screenStream: MediaStream | null;
+  permissionError: string | null;
+  requestingMedia: boolean;
+  requestMedia: () => Promise<void>;
+  connectToParticipant: (userId: string) => void;
+  disconnectParticipant: (userId: string) => void;
+  toggleMic: () => void;
+  toggleCamera: () => void;
+  toggleScreenShare: () => Promise<void>;
+  forceMuteSelf: (permanent?: boolean | string) => void;
+  forceUnmuteSelf: () => void;
+  unlockMic: () => void;
+  cleanupAll: () => void;
+}
+
 export function useMeshCall(
   socket: Socket | null,
   meetingId: string,
   myUserId: string,
-) {
+): UseMeshCallResult {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreams>({});
-  const [micOn, setMicOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
-  const [micLocked, setMicLocked] = useState(false);
-  const [screenSharing, setScreenSharing] = useState(false);
+  const [micOn, setMicOn] = useState<boolean>(true);
+  const [cameraOn, setCameraOn] = useState<boolean>(true);
+  const [micLocked, setMicLocked] = useState<boolean>(false);
+  const [screenSharing, setScreenSharing] = useState<boolean>(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [requestingMedia, setRequestingMedia] = useState(false);
+  const [requestingMedia, setRequestingMedia] = useState<boolean>(false);
 
   const peers = useRef<Map<string, PeerConnectionState>>(new Map());
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
-  const isCleaningUp = useRef(false);
+  const isCleaningUp = useRef<boolean>(false);
   const audioSenders = useRef<Map<string, SenderEntry>>(new Map());
   const videoSenders = useRef<Map<string, SenderEntry>>(new Map());
   const renegotiationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const requestMedia = useCallback(async (): Promise<void> => {
+    if (requestingMedia) return;
+    setRequestingMedia(true);
+    setPermissionError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: "user",
+        },
+      });
+      setLocalStream(stream);
+      stream.getAudioTracks().forEach((t) => {
+        localAudioTrackRef.current = t;
+      });
+      stream.getVideoTracks().forEach((t) => {
+        localVideoTrackRef.current = t;
+      });
+    } catch (err) {
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          setPermissionError(
+            "Camera and microphone permissions were denied. Please allow them in your browser settings and try again.",
+          );
+        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          setPermissionError("No camera or microphone was detected on this device.");
+        } else if (err.name === "NotReadableError" || err.name === "ConstraintNotSatisfiedError") {
+          setPermissionError(
+            "Camera or microphone is already in use by another application or tab.",
+          );
+        } else {
+          setPermissionError(`Media error: ${err.message}`);
+        }
+      } else {
+        setPermissionError(`Media error: ${(err as Error).message}`);
+      }
+    } finally {
+      setRequestingMedia(false);
+    }
+  }, [requestingMedia]);
 
   const safeSetLocalDescription = useCallback(
     async (pc: RTCPeerConnection, description: RTCSessionDescriptionInit) => {
@@ -393,6 +464,34 @@ export function useMeshCall(
     [localStream],
   );
 
+  // When the local stream finally arrives (or is recreated), make sure every
+  // already-existing peer connection actually has our audio + video tracks
+  // attached. Without this, peers created before getUserMedia resolved would
+  // never send media to anyone.
+  useEffect(() => {
+    if (!localStream) return;
+    const audio = localStream.getAudioTracks();
+    const video = localStream.getVideoTracks();
+    peers.current.forEach(({ pc }) => {
+      const existingAudio = pc.getSenders().filter((s) => s.track?.kind === "audio");
+      const existingVideo = pc.getSenders().filter((s) => s.track?.kind === "video");
+      audio.forEach((track) => {
+        const already = existingAudio.find((s) => s.track?.id === track.id);
+        if (!already) {
+          const sender = pc.addTrack(track, localStream);
+          audioSenders.current.set(track.id, { sender, track });
+        }
+      });
+      video.forEach((track) => {
+        const already = existingVideo.find((s) => s.track?.id === track.id);
+        if (!already) {
+          const sender = pc.addTrack(track, localStream);
+          videoSenders.current.set(track.id, { sender, track });
+        }
+      });
+    });
+  }, [localStream]);
+
   const toggleScreenShare = useCallback(async () => {
     if (screenSharing) {
       const camTrack = localVideoTrackRef.current;
@@ -491,6 +590,7 @@ export function useMeshCall(
     screenStream,
     permissionError,
     requestingMedia,
+    requestMedia,
     connectToParticipant,
     disconnectParticipant,
     toggleMic,
@@ -500,5 +600,5 @@ export function useMeshCall(
     forceUnmuteSelf,
     unlockMic,
     cleanupAll,
-  };
+  } satisfies UseMeshCallResult;
 }
