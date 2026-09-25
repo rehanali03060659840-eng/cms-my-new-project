@@ -10,8 +10,12 @@ type RemoteStreams = Record<string, MediaStream>;
 
 interface PeerConnectionState {
   pc: RTCPeerConnection;
-  offerInFlight: boolean;
-  negotiationNeeded: boolean;
+  // "polite" peers roll back their own offer and accept an incoming one
+  // when both sides try to renegotiate at the same time (glare). Exactly
+  // one side of every pair is polite so there's never a standoff.
+  polite: boolean;
+  makingOffer: boolean;
+  ignoreOffer: boolean;
 }
 
 interface SenderEntry {
@@ -65,7 +69,6 @@ export function useMeshCall(
   const hasRequestedOnMount = useRef<boolean>(false);
   const audioSenders = useRef<Map<string, SenderEntry>>(new Map());
   const videoSenders = useRef<Map<string, SenderEntry>>(new Map());
-  const renegotiationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const requestMedia = useCallback(async (): Promise<void> => {
     if (requestingMedia) return;
@@ -131,13 +134,9 @@ export function useMeshCall(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestingMedia]);
 
-  // ---------------------------------------------------------------------
-  // THE FIX: nothing in the original code ever called requestMedia().
-  // It only ran from a button inside the "permissionError" banner, but that
-  // banner only appears *after* a failed attempt — so camera/mic never
-  // initialized on their own when the room loaded. This effect asks for
-  // camera/mic access once, automatically, as soon as the hook mounts.
-  // ---------------------------------------------------------------------
+  // Ask for camera/mic access once, automatically, as soon as the hook
+  // mounts (previously this only ran from a manual "Enable camera & mic"
+  // button, so media never initialized on its own).
   useEffect(() => {
     if (hasRequestedOnMount.current) return;
     hasRequestedOnMount.current = true;
@@ -172,55 +171,6 @@ export function useMeshCall(
     [],
   );
 
-  const scheduleRenegotiation = useCallback(
-    (targetUserId: string) => {
-      if (renegotiationTimer.current) {
-        clearTimeout(renegotiationTimer.current);
-      }
-      renegotiationTimer.current = setTimeout(async () => {
-        renegotiationTimer.current = null;
-        const state = peers.current.get(targetUserId);
-        if (!state) return;
-        const { pc } = state;
-        if (pc.signalingState !== "stable") {
-          state.negotiationNeeded = true;
-          return;
-        }
-        state.offerInFlight = true;
-        state.negotiationNeeded = false;
-        try {
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: true,
-          });
-          const success = await safeSetLocalDescription(pc, offer);
-          if (success) {
-            socket?.emit("webrtc:signal", {
-              meetingId,
-              toUserId: targetUserId,
-              data: { sdp: offer },
-            });
-          }
-        } catch (err) {
-          console.error("Renegotiation error:", err);
-        } finally {
-          const updatedState = peers.current.get(targetUserId);
-          if (updatedState) {
-            updatedState.offerInFlight = false;
-            if (
-              updatedState.negotiationNeeded &&
-              pc.signalingState === "stable"
-            ) {
-              updatedState.negotiationNeeded = false;
-              pc.dispatchEvent(new Event("negotiationneeded"));
-            }
-          }
-        }
-      }, 50);
-    },
-    [safeSetLocalDescription, socket, meetingId],
-  );
-
   const createPeer = useCallback(
     (targetUserId: string, isInitiator: boolean): RTCPeerConnection | null => {
       if (!socket || targetUserId === myUserId) return null;
@@ -231,10 +181,15 @@ export function useMeshCall(
       }
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      // Exactly one side of every pair must be "polite" so a simultaneous
+      // renegotiation from both ends never ends in a standoff. Comparing
+      // the two user IDs gives both sides the same, consistent answer.
+      const polite = myUserId > targetUserId;
       const peerState: PeerConnectionState = {
         pc,
-        offerInFlight: false,
-        negotiationNeeded: false,
+        polite,
+        makingOffer: false,
+        ignoreOffer: false,
       };
       peers.current.set(targetUserId, peerState);
 
@@ -279,16 +234,20 @@ export function useMeshCall(
         }
       };
 
+      // This is the ONLY place an offer is ever created now. Previously,
+      // createPeer *also* manually created an initial offer below when
+      // isInitiator was true — but addTrack() above already queues this
+      // same "negotiationneeded" event automatically. Having both fire
+      // raced against each other and produced exactly the console error
+      // you saw: "signalingState have-local-offer" / m-lines order
+      // mismatch, because a second offer was built while the first one
+      // was still in flight. Removing the duplicate manual offer (further
+      // down) fixes that at the source.
       pc.onnegotiationneeded = async () => {
         const state = peers.current.get(targetUserId);
         if (!state) return;
-        if (pc.signalingState !== "stable" || state.offerInFlight) {
-          state.negotiationNeeded = true;
-          return;
-        }
-        state.offerInFlight = true;
-        state.negotiationNeeded = false;
         try {
+          state.makingOffer = true;
           const offer = await pc.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true,
@@ -298,43 +257,24 @@ export function useMeshCall(
             socket.emit("webrtc:signal", {
               meetingId,
               toUserId: targetUserId,
-              data: { sdp: offer },
+              data: { sdp: pc.localDescription },
             });
           }
         } catch (err) {
           console.error("Negotiation error ignored safely:", err);
         } finally {
-          const updatedState = peers.current.get(targetUserId);
-          if (updatedState) {
-            updatedState.offerInFlight = false;
-            if (
-              updatedState.negotiationNeeded &&
-              pc.signalingState === "stable"
-            ) {
-              updatedState.negotiationNeeded = false;
-              pc.dispatchEvent(new Event("negotiationneeded"));
-            }
-          }
+          state.makingOffer = false;
         }
       };
 
-      if (isInitiator) {
-        pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
-          .then(async (offer) => {
-            if (pc.signalingState !== "stable") return;
-            const success = await safeSetLocalDescription(pc, offer);
-            if (success) {
-              socket.emit("webrtc:signal", {
-                meetingId,
-                toUserId: targetUserId,
-                data: { sdp: offer },
-              });
-            }
-          })
-          .catch((err) => {
-            console.error("Initial offer creation failed:", err);
-          });
-      }
+      // NOTE: the old code had an `if (isInitiator) { pc.createOffer()... }`
+      // block here that manually kicked off the very first offer. It has
+      // been removed on purpose — `onnegotiationneeded` above already fires
+      // automatically once the tracks are added a few lines up, so keeping
+      // both caused the duplicate-offer race described above. `isInitiator`
+      // is kept as a parameter for API compatibility with existing callers
+      // but is intentionally unused now.
+      void isInitiator;
 
       return pc;
     },
@@ -385,37 +325,57 @@ export function useMeshCall(
         if (!state) return;
       }
 
-      const { pc } = state;
+      const { pc, polite } = state;
 
       try {
         if (data.sdp) {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-          if (data.sdp.type === "offer") {
-            state.offerInFlight = false;
+          const description = data.sdp;
+
+          // Perfect-negotiation glare handling: if we're also in the
+          // middle of sending our own offer (or we're not in a stable
+          // state) when an incoming offer arrives, that's a collision.
+          // The polite side rolls its own offer back and accepts the
+          // incoming one; the impolite side ignores the incoming one and
+          // lets its own offer win. This is what actually prevents the
+          // "m-lines order mismatch" error when both sides try to
+          // renegotiate around the same time (e.g. toggling camera /
+          // screen-share close together).
+          const offerCollision =
+            description.type === "offer" &&
+            (state.makingOffer || pc.signalingState !== "stable");
+
+          state.ignoreOffer = !polite && offerCollision;
+          if (state.ignoreOffer) {
+            return;
+          }
+
+          if (offerCollision) {
+            await Promise.all([
+              pc.setLocalDescription({ type: "rollback" }),
+              pc.setRemoteDescription(new RTCSessionDescription(description)),
+            ]);
+          } else {
+            await pc.setRemoteDescription(new RTCSessionDescription(description));
+          }
+
+          if (description.type === "offer") {
             const answer = await pc.createAnswer();
             const success = await safeSetLocalDescription(pc, answer);
             if (success) {
               socket.emit("webrtc:signal", {
                 meetingId,
                 toUserId: fromUserId,
-                data: { sdp: answer },
+                data: { sdp: pc.localDescription },
               });
-            }
-          } else if (data.sdp.type === "answer") {
-            state.offerInFlight = false;
-            if (
-              state.negotiationNeeded &&
-              pc.signalingState === "stable"
-            ) {
-              state.negotiationNeeded = false;
-              pc.dispatchEvent(new Event("negotiationneeded"));
             }
           }
         } else if (data.candidate && pc.remoteDescription) {
           try {
             await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
           } catch (err) {
-            console.warn("ICE candidate add failed:", err);
+            if (!state.ignoreOffer) {
+              console.warn("ICE candidate add failed:", err);
+            }
           }
         }
       } catch (err) {
@@ -448,10 +408,16 @@ export function useMeshCall(
         track.enabled = next;
       });
       socket?.emit("meeting:camera-state", { meetingId, cameraOff: !next });
-      scheduleRenegotiation(myUserId);
+      // NOTE: the old code called `scheduleRenegotiation(myUserId)` here.
+      // That function looked up a peer connection keyed by *your own*
+      // user ID, which never exists in the `peers` map (you don't have a
+      // peer connection to yourself), so it was a silent no-op. Simply
+      // flipping `track.enabled` is all that's needed for mute/unmute or
+      // camera on/off — the browser propagates that to the remote side
+      // without any SDP renegotiation, so no replacement call is needed.
       return next;
     });
-  }, [localStream, socket, meetingId, scheduleRenegotiation, myUserId]);
+  }, [localStream, socket, meetingId]);
 
   const forceMuteSelf = useCallback(
     (permanent?: boolean | string) => {
@@ -592,10 +558,6 @@ export function useMeshCall(
 
   const cleanupAll = useCallback(() => {
     isCleaningUp.current = true;
-    if (renegotiationTimer.current) {
-      clearTimeout(renegotiationTimer.current);
-      renegotiationTimer.current = null;
-    }
     localStream?.getTracks().forEach((track) => track.stop());
     screenStream?.getTracks().forEach((track) => track.stop());
     peers.current.forEach(({ pc }) => pc.close());

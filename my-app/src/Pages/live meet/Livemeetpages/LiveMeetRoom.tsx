@@ -86,6 +86,34 @@ export const LiveMeetRoom = () => {
     cleanupAll,
   } = useMeshCall(socket, meetingId ?? "", myId);
 
+  // ---------------------------------------------------------------------
+  // THE FIX: the socket listeners registered in the big useEffect below only
+  // run once (its deps are just [socket, meetingId]), which is very early —
+  // usually before getUserMedia() has resolved, i.e. while `localStream` is
+  // still null. Functions like forceMuteSelf/forceUnmuteSelf/cleanupAll are
+  // recreated every time `localStream` changes, but the listeners captured
+  // whichever versions existed at that first, early render — a *stale*
+  // closure where localStream was null forever, no matter what happened
+  // later. That's why muting a participant (or being muted/locked by the
+  // host) never actually touched the real audio track — only the UI state
+  // changed — and why ending the call didn't actually stop the camera/mic
+  // (cleanupAll ran against a null stream). Keeping these functions in refs
+  // that are updated on every render, and calling `.current()` inside the
+  // socket handlers, guarantees they always act on the live stream.
+  // ---------------------------------------------------------------------
+  const forceMuteSelfRef = useRef(forceMuteSelf);
+  const forceUnmuteSelfRef = useRef(forceUnmuteSelf);
+  const unlockMicRef = useRef(unlockMic);
+  const cleanupAllRef = useRef(cleanupAll);
+  const disconnectParticipantRef = useRef(disconnectParticipant);
+  useEffect(() => {
+    forceMuteSelfRef.current = forceMuteSelf;
+    forceUnmuteSelfRef.current = forceUnmuteSelf;
+    unlockMicRef.current = unlockMic;
+    cleanupAllRef.current = cleanupAll;
+    disconnectParticipantRef.current = disconnectParticipant;
+  });
+
   const me = participants.find((p) => p.userId === myId);
   const isHost = me?.isHost || meeting?.hostId === myId;
   const isHostRef = useRef(isHost);
@@ -120,7 +148,7 @@ export const LiveMeetRoom = () => {
     const onMuted = (e: any) => {
       const isPermanent = e.permanent === true || e.permanent === "true";
       if (e.userId === myId) {
-        forceMuteSelf(isPermanent);
+        forceMuteSelfRef.current(isPermanent);
         toast(
           isPermanent
             ? "Host permanently muted your microphone"
@@ -137,7 +165,7 @@ export const LiveMeetRoom = () => {
     };
     const onUnmuted = (e: any) => {
       if (e.userId === myId) {
-        forceUnmuteSelf();
+        forceUnmuteSelfRef.current();
 
         toast.success("Host unmuted your microphone");
       }
@@ -167,13 +195,13 @@ export const LiveMeetRoom = () => {
       );
 
       if (!isHostRef.current) {
-        forceMuteSelf(false);
+        forceMuteSelfRef.current(false);
         toast("Host muted everyone");
       }
     };
     const onUnlocked = (e: any) => {
       if (e.userId === myId) {
-        unlockMic();
+        unlockMicRef.current();
         toast("Host allowed you to unmute yourself");
       }
       setParticipants((p) =>
@@ -188,7 +216,7 @@ export const LiveMeetRoom = () => {
     };
     const onRemoved = (e: any) => {
       if (e.meetingId === meetingId) {
-        cleanupAll();
+        cleanupAllRef.current();
         toast.error(
           e.blocked
             ? "You were removed and blocked from this meeting"
@@ -199,10 +227,10 @@ export const LiveMeetRoom = () => {
     };
     const onEnded = () => {
       setEnded(true);
-      cleanupAll();
+      cleanupAllRef.current();
       setTimeout(() => navigate("/live-meet"), 1500);
     };
-    const onLeft = (e: any) => disconnectParticipant(e.userId);
+    const onLeft = (e: any) => disconnectParticipantRef.current(e.userId);
     socket.on("meeting:participants", onParts);
     socket.on("meeting:started", onStarted);
     socket.on("meeting:approved", onApproved);
@@ -228,7 +256,10 @@ export const LiveMeetRoom = () => {
       socket.off("meeting:ended", onEnded);
       socket.off("meeting:participant-left", onLeft);
       socket.off("meeting:participant-unmuted", onUnmuted);
-      cleanupAll();
+      // Same fix here: use the ref so unmounting the room always stops the
+      // *current* live stream, not whichever one existed when this effect
+      // first ran.
+      cleanupAllRef.current();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, meetingId]);
