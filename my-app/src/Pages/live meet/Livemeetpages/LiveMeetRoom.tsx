@@ -243,6 +243,8 @@ export const LiveMeetRoom = () => {
     socket.on("meeting:ended", onEnded);
     socket.on("meeting:participant-left", onLeft);
     socket.on("meeting:participant-unmuted", onUnmuted);
+    socket.on("meeting:camera-state", onCameraState);
+socket.on("meeting:mic-state", onMicState);
     return () => {
       socket.off("meeting:participants", onParts);
       socket.off("meeting:started", onStarted);
@@ -256,6 +258,8 @@ export const LiveMeetRoom = () => {
       socket.off("meeting:ended", onEnded);
       socket.off("meeting:participant-left", onLeft);
       socket.off("meeting:participant-unmuted", onUnmuted);
+      socket.off("meeting:camera-state", onCameraState);
+socket.off("meeting:mic-state", onMicState);
       // Same fix here: use the ref so unmounting the room always stops the
       // *current* live stream, not whichever one existed when this effect
       // first ran.
@@ -263,7 +267,20 @@ export const LiveMeetRoom = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, meetingId]);
-
+const onCameraState = (e: { userId: string; cameraOff: boolean }) => {
+  setParticipants((prev) =>
+    prev.map((p) =>
+      p.userId === e.userId ? { ...p, cameraOff: e.cameraOff } : p,
+    ),
+  );
+};
+const onMicState = (e: { userId: string; muted: boolean }) => {
+  setParticipants((prev) =>
+    prev.map((p) =>
+      p.userId === e.userId ? { ...p, muted: e.muted } : p,
+    ),
+  );
+};
   // Reflect our own screen-share state as the presenter too, in case the
   // server doesn't echo "meeting:screen-share" back to the sender.
   useEffect(() => {

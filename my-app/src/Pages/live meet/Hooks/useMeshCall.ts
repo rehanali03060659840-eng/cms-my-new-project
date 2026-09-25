@@ -10,12 +10,11 @@ type RemoteStreams = Record<string, MediaStream>;
 
 interface PeerConnectionState {
   pc: RTCPeerConnection;
-  // "polite" peers roll back their own offer and accept an incoming one
-  // when both sides try to renegotiate at the same time (glare). Exactly
-  // one side of every pair is polite so there's never a standoff.
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
+  // === FIX: queue ICE candidates that arrive before remoteDescription
+  pendingCandidates: RTCIceCandidateInit[];
 }
 
 interface SenderEntry {
@@ -23,7 +22,6 @@ interface SenderEntry {
   track: MediaStreamTrack;
 }
 
-/** The shape of everything the hook exposes to its consumers. */
 export interface UseMeshCallResult {
   localStream: MediaStream | null;
   remoteStreams: RemoteStreams;
@@ -53,34 +51,39 @@ export function useMeshCall(
 ): UseMeshCallResult {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreams>({});
-  const [micOn, setMicOn] = useState<boolean>(true);
-  const [cameraOn, setCameraOn] = useState<boolean>(true);
-  const [micLocked, setMicLocked] = useState<boolean>(false);
-  const [screenSharing, setScreenSharing] = useState<boolean>(false);
+  const [micOn, setMicOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(true);
+  const [micLocked, setMicLocked] = useState(false);
+  const [screenSharing, setScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [requestingMedia, setRequestingMedia] = useState<boolean>(false);
+  const [requestingMedia, setRequestingMedia] = useState(false);
 
   const peers = useRef<Map<string, PeerConnectionState>>(new Map());
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
-  const isCleaningUp = useRef<boolean>(false);
-  const hasRequestedOnMount = useRef<boolean>(false);
+  const isCleaningUp = useRef(false);
+  const hasRequestedOnMount = useRef(false);
   const audioSenders = useRef<Map<string, SenderEntry>>(new Map());
   const videoSenders = useRef<Map<string, SenderEntry>>(new Map());
+
+  // Keep latest toggle state accessible inside async media request
+  const micOnRef = useRef(micOn);
+  const cameraOnRef = useRef(cameraOn);
+  useEffect(() => {
+    micOnRef.current = micOn;
+    cameraOnRef.current = cameraOn;
+  }, [micOn, cameraOn]);
 
   const requestMedia = useCallback(async (): Promise<void> => {
     if (requestingMedia) return;
     setRequestingMedia(true);
     setPermissionError(null);
 
-    // Basic environment guard: getUserMedia only exists in secure contexts
-    // (https or localhost). If it's missing, fail fast with a clear message
-    // instead of throwing a confusing runtime error.
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia) {
       setPermissionError(
-        "Camera/microphone access isn't available in this browser context. Make sure the page is loaded over HTTPS.",
+        "Camera/microphone access isn't available. Page must be HTTPS or localhost.",
       );
       setRequestingMedia(false);
       return;
@@ -100,27 +103,31 @@ export function useMeshCall(
           facingMode: "user",
         },
       });
-      setLocalStream(stream);
+
+      // === FIX: apply current UI state (refs) so toggles that happened
+      // while the permission dialog was open are respected
       stream.getAudioTracks().forEach((t) => {
         localAudioTrackRef.current = t;
-        // Respect whatever mic/cam state the user had toggled to before.
-        t.enabled = micOn;
+        t.enabled = micOnRef.current;
       });
       stream.getVideoTracks().forEach((t) => {
         localVideoTrackRef.current = t;
-        t.enabled = cameraOn;
+        t.enabled = cameraOnRef.current;
       });
+
+      setLocalStream(stream);
+      setPermissionError(null);
     } catch (err) {
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
           setPermissionError(
-            "Camera and microphone permissions were denied. Please allow them in your browser settings and try again.",
+            "Camera and microphone permissions were denied. Allow them in browser settings and click Enable again.",
           );
         } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-          setPermissionError("No camera or microphone was detected on this device.");
+          setPermissionError("No camera or microphone detected on this device.");
         } else if (err.name === "NotReadableError" || err.name === "ConstraintNotSatisfiedError") {
           setPermissionError(
-            "Camera or microphone is already in use by another application or tab.",
+            "Camera or microphone is already in use by another app/tab. Close other apps and try again.",
           );
         } else {
           setPermissionError(`Media error: ${err.message}`);
@@ -131,18 +138,13 @@ export function useMeshCall(
     } finally {
       setRequestingMedia(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestingMedia]);
 
-  // Ask for camera/mic access once, automatically, as soon as the hook
-  // mounts (previously this only ran from a manual "Enable camera & mic"
-  // button, so media never initialized on its own).
   useEffect(() => {
     if (hasRequestedOnMount.current) return;
     hasRequestedOnMount.current = true;
     requestMedia();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [requestMedia]);
 
   const safeSetLocalDescription = useCallback(
     async (pc: RTCPeerConnection, description: RTCSessionDescriptionInit) => {
@@ -157,12 +159,7 @@ export function useMeshCall(
             err.name === "InvalidStateError" ||
             err.name === "InvalidModificationError")
         ) {
-          console.warn(
-            "setLocalDescription failed safely (signalingState:",
-            pc.signalingState,
-            "):",
-            err.message,
-          );
+          console.warn("setLocalDescription safe-fail:", pc.signalingState, err.message);
           return false;
         }
         throw err;
@@ -172,35 +169,34 @@ export function useMeshCall(
   );
 
   const createPeer = useCallback(
-    (targetUserId: string, isInitiator: boolean): RTCPeerConnection | null => {
+    (targetUserId: string, _isInitiator: boolean): RTCPeerConnection | null => {
       if (!socket || targetUserId === myUserId) return null;
 
       const existing = peers.current.get(targetUserId);
       if (existing) {
         existing.pc.close();
+        peers.current.delete(targetUserId);
       }
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      // Exactly one side of every pair must be "polite" so a simultaneous
-      // renegotiation from both ends never ends in a standoff. Comparing
-      // the two user IDs gives both sides the same, consistent answer.
       const polite = myUserId > targetUserId;
+
       const peerState: PeerConnectionState = {
         pc,
         polite,
         makingOffer: false,
         ignoreOffer: false,
+        pendingCandidates: [], // === FIX
       };
       peers.current.set(targetUserId, peerState);
 
+      // Add existing local tracks immediately (if already available)
       if (localStream) {
-        const audioTracks = localStream.getAudioTracks();
-        const videoTracks = localStream.getVideoTracks();
-        audioTracks.forEach((track) => {
+        localStream.getAudioTracks().forEach((track) => {
           const sender = pc.addTrack(track, localStream);
           audioSenders.current.set(track.id, { sender, track });
         });
-        videoTracks.forEach((track) => {
+        localStream.getVideoTracks().forEach((track) => {
           const sender = pc.addTrack(track, localStream);
           videoSenders.current.set(track.id, { sender, track });
         });
@@ -216,10 +212,18 @@ export function useMeshCall(
         }
       };
 
+      // === FIX: robust ontrack – never lose the stream
       pc.ontrack = (e) => {
-        if (e.streams[0]) {
-          setRemoteStreams((prev) => ({ ...prev, [targetUserId]: e.streams[0] }));
-        }
+        setRemoteStreams((prev) => {
+          const existingStream = prev[targetUserId];
+          if (existingStream) {
+            const already = existingStream.getTracks().some((t) => t.id === e.track.id);
+            if (!already) existingStream.addTrack(e.track);
+            return { ...prev, [targetUserId]: existingStream };
+          }
+          const stream = e.streams[0] ?? new MediaStream([e.track]);
+          return { ...prev, [targetUserId]: stream };
+        });
       };
 
       pc.onconnectionstatechange = () => {
@@ -234,18 +238,9 @@ export function useMeshCall(
         }
       };
 
-      // This is the ONLY place an offer is ever created now. Previously,
-      // createPeer *also* manually created an initial offer below when
-      // isInitiator was true — but addTrack() above already queues this
-      // same "negotiationneeded" event automatically. Having both fire
-      // raced against each other and produced exactly the console error
-      // you saw: "signalingState have-local-offer" / m-lines order
-      // mismatch, because a second offer was built while the first one
-      // was still in flight. Removing the duplicate manual offer (further
-      // down) fixes that at the source.
       pc.onnegotiationneeded = async () => {
         const state = peers.current.get(targetUserId);
-        if (!state) return;
+        if (!state || state.makingOffer) return;
         try {
           state.makingOffer = true;
           const offer = await pc.createOffer({
@@ -253,7 +248,7 @@ export function useMeshCall(
             offerToReceiveVideo: true,
           });
           const success = await safeSetLocalDescription(pc, offer);
-          if (success) {
+          if (success && pc.localDescription) {
             socket.emit("webrtc:signal", {
               meetingId,
               toUserId: targetUserId,
@@ -261,20 +256,11 @@ export function useMeshCall(
             });
           }
         } catch (err) {
-          console.error("Negotiation error ignored safely:", err);
+          console.error("Negotiation error:", err);
         } finally {
           state.makingOffer = false;
         }
       };
-
-      // NOTE: the old code had an `if (isInitiator) { pc.createOffer()... }`
-      // block here that manually kicked off the very first offer. It has
-      // been removed on purpose — `onnegotiationneeded` above already fires
-      // automatically once the tracks are added a few lines up, so keeping
-      // both caused the duplicate-offer race described above. `isInitiator`
-      // is kept as a parameter for API compatibility with existing callers
-      // but is intentionally unused now.
-      void isInitiator;
 
       return pc;
     },
@@ -301,6 +287,21 @@ export function useMeshCall(
       delete next[userId];
       return next;
     });
+  }, []);
+
+  // === FIX: flush pending ICE candidates after remoteDescription is set
+  const flushPendingCandidates = useCallback(async (fromUserId: string) => {
+    const state = peers.current.get(fromUserId);
+    if (!state || !state.pc.remoteDescription) return;
+    const candidates = [...state.pendingCandidates];
+    state.pendingCandidates = [];
+    for (const c of candidates) {
+      try {
+        await state.pc.addIceCandidate(new RTCIceCandidate(c));
+      } catch (err) {
+        if (!state.ignoreOffer) console.warn("Late ICE add failed:", err);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -331,23 +332,12 @@ export function useMeshCall(
         if (data.sdp) {
           const description = data.sdp;
 
-          // Perfect-negotiation glare handling: if we're also in the
-          // middle of sending our own offer (or we're not in a stable
-          // state) when an incoming offer arrives, that's a collision.
-          // The polite side rolls its own offer back and accepts the
-          // incoming one; the impolite side ignores the incoming one and
-          // lets its own offer win. This is what actually prevents the
-          // "m-lines order mismatch" error when both sides try to
-          // renegotiate around the same time (e.g. toggling camera /
-          // screen-share close together).
           const offerCollision =
             description.type === "offer" &&
             (state.makingOffer || pc.signalingState !== "stable");
 
           state.ignoreOffer = !polite && offerCollision;
-          if (state.ignoreOffer) {
-            return;
-          }
+          if (state.ignoreOffer) return;
 
           if (offerCollision) {
             await Promise.all([
@@ -358,10 +348,13 @@ export function useMeshCall(
             await pc.setRemoteDescription(new RTCSessionDescription(description));
           }
 
+          // === FIX: flush any candidates that arrived early
+          await flushPendingCandidates(fromUserId);
+
           if (description.type === "offer") {
             const answer = await pc.createAnswer();
             const success = await safeSetLocalDescription(pc, answer);
-            if (success) {
+            if (success && pc.localDescription) {
               socket.emit("webrtc:signal", {
                 meetingId,
                 toUserId: fromUserId,
@@ -369,13 +362,16 @@ export function useMeshCall(
               });
             }
           }
-        } else if (data.candidate && pc.remoteDescription) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-          } catch (err) {
-            if (!state.ignoreOffer) {
-              console.warn("ICE candidate add failed:", err);
+        } else if (data.candidate) {
+          // === FIX: queue if remoteDescription not ready yet
+          if (pc.remoteDescription) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (err) {
+              if (!state.ignoreOffer) console.warn("ICE candidate add failed:", err);
             }
+          } else {
+            state.pendingCandidates.push(data.candidate);
           }
         }
       } catch (err) {
@@ -387,7 +383,31 @@ export function useMeshCall(
     return () => {
       socket.off("webrtc:signal", onSignal);
     };
-  }, [socket, myUserId, meetingId, createPeer, safeSetLocalDescription]);
+  }, [socket, myUserId, meetingId, createPeer, safeSetLocalDescription, flushPendingCandidates]);
+
+  // === FIX: when localStream finally arrives, attach tracks to ALL existing peers
+  // and force renegotiation so the other side actually receives media
+  useEffect(() => {
+    if (!localStream) return;
+
+    peers.current.forEach(({ pc }) => {
+      const existingAudio = pc.getSenders().filter((s) => s.track?.kind === "audio");
+      const existingVideo = pc.getSenders().filter((s) => s.track?.kind === "video");
+
+      localStream.getAudioTracks().forEach((track) => {
+        if (!existingAudio.find((s) => s.track?.id === track.id)) {
+          const sender = pc.addTrack(track, localStream);
+          audioSenders.current.set(track.id, { sender, track });
+        }
+      });
+      localStream.getVideoTracks().forEach((track) => {
+        if (!existingVideo.find((s) => s.track?.id === track.id)) {
+          const sender = pc.addTrack(track, localStream);
+          videoSenders.current.set(track.id, { sender, track });
+        }
+      });
+    });
+  }, [localStream]);
 
   const toggleMic = useCallback(() => {
     if (micLocked) return;
@@ -396,6 +416,7 @@ export function useMeshCall(
       localStream?.getAudioTracks().forEach((track) => {
         track.enabled = next;
       });
+      if (localAudioTrackRef.current) localAudioTrackRef.current.enabled = next;
       socket?.emit("meeting:mic-state", { meetingId, muted: !next });
       return next;
     });
@@ -407,35 +428,25 @@ export function useMeshCall(
       localStream?.getVideoTracks().forEach((track) => {
         track.enabled = next;
       });
+      if (localVideoTrackRef.current) localVideoTrackRef.current.enabled = next;
       socket?.emit("meeting:camera-state", { meetingId, cameraOff: !next });
-      // NOTE: the old code called `scheduleRenegotiation(myUserId)` here.
-      // That function looked up a peer connection keyed by *your own*
-      // user ID, which never exists in the `peers` map (you don't have a
-      // peer connection to yourself), so it was a silent no-op. Simply
-      // flipping `track.enabled` is all that's needed for mute/unmute or
-      // camera on/off — the browser propagates that to the remote side
-      // without any SDP renegotiation, so no replacement call is needed.
       return next;
     });
   }, [localStream, socket, meetingId]);
 
   const forceMuteSelf = useCallback(
     (permanent?: boolean | string) => {
-      localStream?.getAudioTracks().forEach((track) => {
-        track.enabled = false;
-      });
+      localStream?.getAudioTracks().forEach((t) => (t.enabled = false));
+      if (localAudioTrackRef.current) localAudioTrackRef.current.enabled = false;
       setMicOn(false);
-      if (permanent === true || permanent === "true") {
-        setMicLocked(true);
-      }
+      if (permanent === true || permanent === "true") setMicLocked(true);
     },
     [localStream],
   );
 
   const forceUnmuteSelf = useCallback(() => {
-    localStream?.getAudioTracks().forEach((track) => {
-      track.enabled = true;
-    });
+    localStream?.getAudioTracks().forEach((t) => (t.enabled = true));
+    if (localAudioTrackRef.current) localAudioTrackRef.current.enabled = true;
     setMicLocked(false);
     setMicOn(true);
     socket?.emit("meeting:mic-state", { meetingId, muted: false });
@@ -460,34 +471,6 @@ export function useMeshCall(
     },
     [localStream],
   );
-
-  // When the local stream finally arrives (or is recreated), make sure every
-  // already-existing peer connection actually has our audio + video tracks
-  // attached. Without this, peers created before getUserMedia resolved would
-  // never send media to anyone.
-  useEffect(() => {
-    if (!localStream) return;
-    const audio = localStream.getAudioTracks();
-    const video = localStream.getVideoTracks();
-    peers.current.forEach(({ pc }) => {
-      const existingAudio = pc.getSenders().filter((s) => s.track?.kind === "audio");
-      const existingVideo = pc.getSenders().filter((s) => s.track?.kind === "video");
-      audio.forEach((track) => {
-        const already = existingAudio.find((s) => s.track?.id === track.id);
-        if (!already) {
-          const sender = pc.addTrack(track, localStream);
-          audioSenders.current.set(track.id, { sender, track });
-        }
-      });
-      video.forEach((track) => {
-        const already = existingVideo.find((s) => s.track?.id === track.id);
-        if (!already) {
-          const sender = pc.addTrack(track, localStream);
-          videoSenders.current.set(track.id, { sender, track });
-        }
-      });
-    });
-  }, [localStream]);
 
   const toggleScreenShare = useCallback(async () => {
     if (screenSharing) {
@@ -531,7 +514,6 @@ export function useMeshCall(
         });
         track.removeEventListener("ended", handleTrackEnded);
       };
-
       track.addEventListener("ended", handleTrackEnded);
 
       setScreenSharing(true);
@@ -547,19 +529,12 @@ export function useMeshCall(
         console.error("Screen share error:", err);
       }
     }
-  }, [
-    screenSharing,
-    localStream,
-    socket,
-    meetingId,
-    myUserId,
-    replaceVideoTrackOnAllPeers,
-  ]);
+  }, [screenSharing, socket, meetingId, myUserId, replaceVideoTrackOnAllPeers]);
 
   const cleanupAll = useCallback(() => {
     isCleaningUp.current = true;
-    localStream?.getTracks().forEach((track) => track.stop());
-    screenStream?.getTracks().forEach((track) => track.stop());
+    localStream?.getTracks().forEach((t) => t.stop());
+    screenStream?.getTracks().forEach((t) => t.stop());
     peers.current.forEach(({ pc }) => pc.close());
     peers.current.clear();
     audioSenders.current.clear();
