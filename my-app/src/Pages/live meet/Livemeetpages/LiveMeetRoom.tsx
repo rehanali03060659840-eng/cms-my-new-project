@@ -17,7 +17,7 @@ import {
   Shield,
   Unlock,
   UserMinus,
-  UserPlus, 
+  UserPlus,
   Users,
   Volume2,
   VolumeX,
@@ -328,7 +328,7 @@ export const LiveMeetRoom = () => {
           toast.error(response?.message || "Unable to unmute participant");
         }
       },
-    ); 
+    );
 
     setParticipants((prev) =>
       prev.map((p) =>
@@ -448,6 +448,17 @@ export const LiveMeetRoom = () => {
           )}
         </div>
       </header>
+
+      {/* Shown only while the very first getUserMedia() call is pending, so
+          the person knows a permission prompt is coming / camera is warming
+          up, instead of just seeing a blank tile with no explanation. */}
+      {requestingMedia && !localStream && !permissionError && (
+        <div className="flex items-center gap-2 border-b border-indigo-500/30 bg-indigo-500/10 px-5 py-2.5 text-xs text-indigo-200">
+          <span className="h-3 w-3 animate-pulse rounded-full bg-indigo-400" />
+          Requesting camera & microphone access — please allow the permission
+          prompt from your browser…
+        </div>
+      )}
 
       {permissionError && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2.5 text-xs text-amber-200">

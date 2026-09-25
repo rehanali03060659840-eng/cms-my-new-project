@@ -62,6 +62,7 @@ export function useMeshCall(
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
   const isCleaningUp = useRef<boolean>(false);
+  const hasRequestedOnMount = useRef<boolean>(false);
   const audioSenders = useRef<Map<string, SenderEntry>>(new Map());
   const videoSenders = useRef<Map<string, SenderEntry>>(new Map());
   const renegotiationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,6 +71,18 @@ export function useMeshCall(
     if (requestingMedia) return;
     setRequestingMedia(true);
     setPermissionError(null);
+
+    // Basic environment guard: getUserMedia only exists in secure contexts
+    // (https or localhost). If it's missing, fail fast with a clear message
+    // instead of throwing a confusing runtime error.
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setPermissionError(
+        "Camera/microphone access isn't available in this browser context. Make sure the page is loaded over HTTPS.",
+      );
+      setRequestingMedia(false);
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -87,9 +100,12 @@ export function useMeshCall(
       setLocalStream(stream);
       stream.getAudioTracks().forEach((t) => {
         localAudioTrackRef.current = t;
+        // Respect whatever mic/cam state the user had toggled to before.
+        t.enabled = micOn;
       });
       stream.getVideoTracks().forEach((t) => {
         localVideoTrackRef.current = t;
+        t.enabled = cameraOn;
       });
     } catch (err) {
       if (err instanceof DOMException) {
@@ -112,7 +128,22 @@ export function useMeshCall(
     } finally {
       setRequestingMedia(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestingMedia]);
+
+  // ---------------------------------------------------------------------
+  // THE FIX: nothing in the original code ever called requestMedia().
+  // It only ran from a button inside the "permissionError" banner, but that
+  // banner only appears *after* a failed attempt — so camera/mic never
+  // initialized on their own when the room loaded. This effect asks for
+  // camera/mic access once, automatically, as soon as the hook mounts.
+  // ---------------------------------------------------------------------
+  useEffect(() => {
+    if (hasRequestedOnMount.current) return;
+    hasRequestedOnMount.current = true;
+    requestMedia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const safeSetLocalDescription = useCallback(
     async (pc: RTCPeerConnection, description: RTCSessionDescriptionInit) => {
@@ -135,7 +166,7 @@ export function useMeshCall(
           );
           return false;
         }
-        throw err; 
+        throw err;
       }
     },
     [],
