@@ -13,13 +13,7 @@ interface PeerConnectionState {
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
-  // === FIX: queue ICE candidates that arrive before remoteDescription
   pendingCandidates: RTCIceCandidateInit[];
-}
-
-interface SenderEntry {
-  sender: RTCRtpSender;
-  track: MediaStreamTrack;
 }
 
 export interface UseMeshCallResult {
@@ -63,14 +57,16 @@ export function useMeshCall(
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
-  const isCleaningUp = useRef(false);
   const hasRequestedOnMount = useRef(false);
-  const audioSenders = useRef<Map<string, SenderEntry>>(new Map());
-  const videoSenders = useRef<Map<string, SenderEntry>>(new Map());
 
-  // Keep latest toggle state accessible inside async media request
+  // Stable refs so createPeer + signal listener do NOT re-create every time stream arrives
+  const localStreamRef = useRef<MediaStream | null>(null);
   const micOnRef = useRef(micOn);
   const cameraOnRef = useRef(cameraOn);
+
+  useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
   useEffect(() => {
     micOnRef.current = micOn;
     cameraOnRef.current = cameraOn;
@@ -104,8 +100,6 @@ export function useMeshCall(
         },
       });
 
-      // === FIX: apply current UI state (refs) so toggles that happened
-      // while the permission dialog was open are respected
       stream.getAudioTracks().forEach((t) => {
         localAudioTrackRef.current = t;
         t.enabled = micOnRef.current;
@@ -168,8 +162,28 @@ export function useMeshCall(
     [],
   );
 
+  // Helper: add local tracks to a peer if missing
+  const ensureTracksOnPeer = useCallback((pc: RTCPeerConnection) => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    const existingAudio = pc.getSenders().filter((s) => s.track?.kind === "audio");
+    const existingVideo = pc.getSenders().filter((s) => s.track?.kind === "video");
+
+    stream.getAudioTracks().forEach((track) => {
+      if (!existingAudio.some((s) => s.track?.id === track.id)) {
+        pc.addTrack(track, stream);
+      }
+    });
+    stream.getVideoTracks().forEach((track) => {
+      if (!existingVideo.some((s) => s.track?.id === track.id)) {
+        pc.addTrack(track, stream);
+      }
+    });
+  }, []);
+
   const createPeer = useCallback(
-    (targetUserId: string, _isInitiator: boolean): RTCPeerConnection | null => {
+    (targetUserId: string): RTCPeerConnection | null => {
       if (!socket || targetUserId === myUserId) return null;
 
       const existing = peers.current.get(targetUserId);
@@ -186,21 +200,12 @@ export function useMeshCall(
         polite,
         makingOffer: false,
         ignoreOffer: false,
-        pendingCandidates: [], // === FIX
+        pendingCandidates: [],
       };
       peers.current.set(targetUserId, peerState);
 
-      // Add existing local tracks immediately (if already available)
-      if (localStream) {
-        localStream.getAudioTracks().forEach((track) => {
-          const sender = pc.addTrack(track, localStream);
-          audioSenders.current.set(track.id, { sender, track });
-        });
-        localStream.getVideoTracks().forEach((track) => {
-          const sender = pc.addTrack(track, localStream);
-          videoSenders.current.set(track.id, { sender, track });
-        });
-      }
+      // Add tracks immediately if stream already ready
+      ensureTracksOnPeer(pc);
 
       pc.onicecandidate = (e) => {
         if (e.candidate) {
@@ -212,13 +217,13 @@ export function useMeshCall(
         }
       };
 
-      // === FIX: robust ontrack – never lose the stream
       pc.ontrack = (e) => {
         setRemoteStreams((prev) => {
           const existingStream = prev[targetUserId];
           if (existingStream) {
-            const already = existingStream.getTracks().some((t) => t.id === e.track.id);
-            if (!already) existingStream.addTrack(e.track);
+            if (!existingStream.getTracks().some((t) => t.id === e.track.id)) {
+              existingStream.addTrack(e.track);
+            }
             return { ...prev, [targetUserId]: existingStream };
           }
           const stream = e.streams[0] ?? new MediaStream([e.track]);
@@ -227,6 +232,7 @@ export function useMeshCall(
       };
 
       pc.onconnectionstatechange = () => {
+        console.log(`[WebRTC] ${targetUserId} connectionState:`, pc.connectionState);
         if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
           pc.close();
           peers.current.delete(targetUserId);
@@ -236,6 +242,10 @@ export function useMeshCall(
             return next;
           });
         }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log(`[WebRTC] ${targetUserId} iceConnectionState:`, pc.iceConnectionState);
       };
 
       pc.onnegotiationneeded = async () => {
@@ -264,13 +274,13 @@ export function useMeshCall(
 
       return pc;
     },
-    [socket, meetingId, myUserId, localStream, safeSetLocalDescription],
+    [socket, meetingId, myUserId, ensureTracksOnPeer, safeSetLocalDescription],
   );
 
   const connectToParticipant = useCallback(
     (userId: string) => {
       if (userId !== myUserId && !peers.current.has(userId)) {
-        createPeer(userId, true);
+        createPeer(userId);
       }
     },
     [createPeer, myUserId],
@@ -289,7 +299,6 @@ export function useMeshCall(
     });
   }, []);
 
-  // === FIX: flush pending ICE candidates after remoteDescription is set
   const flushPendingCandidates = useCallback(async (fromUserId: string) => {
     const state = peers.current.get(fromUserId);
     if (!state || !state.pc.remoteDescription) return;
@@ -304,6 +313,7 @@ export function useMeshCall(
     }
   }, []);
 
+  // Signal listener — now stable because createPeer no longer depends on localStream
   useEffect(() => {
     if (!socket) return;
 
@@ -320,8 +330,7 @@ export function useMeshCall(
 
       let state = peers.current.get(fromUserId);
       if (!state) {
-        const pc = createPeer(fromUserId, false);
-        if (!pc) return;
+        createPeer(fromUserId);
         state = peers.current.get(fromUserId);
         if (!state) return;
       }
@@ -348,10 +357,12 @@ export function useMeshCall(
             await pc.setRemoteDescription(new RTCSessionDescription(description));
           }
 
-          // === FIX: flush any candidates that arrived early
           await flushPendingCandidates(fromUserId);
 
           if (description.type === "offer") {
+            // Make sure we have tracks before answering
+            ensureTracksOnPeer(pc);
+
             const answer = await pc.createAnswer();
             const success = await safeSetLocalDescription(pc, answer);
             if (success && pc.localDescription) {
@@ -363,7 +374,6 @@ export function useMeshCall(
             }
           }
         } else if (data.candidate) {
-          // === FIX: queue if remoteDescription not ready yet
           if (pc.remoteDescription) {
             try {
               await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -383,39 +393,30 @@ export function useMeshCall(
     return () => {
       socket.off("webrtc:signal", onSignal);
     };
-  }, [socket, myUserId, meetingId, createPeer, safeSetLocalDescription, flushPendingCandidates]);
+  }, [
+    socket,
+    myUserId,
+    meetingId,
+    createPeer,
+    safeSetLocalDescription,
+    flushPendingCandidates,
+    ensureTracksOnPeer,
+  ]);
 
-  // === FIX: when localStream finally arrives, attach tracks to ALL existing peers
-  // and force renegotiation so the other side actually receives media
+  // When localStream finally arrives → attach to every existing peer
+  // (this triggers negotiationneeded automatically)
   useEffect(() => {
     if (!localStream) return;
-
     peers.current.forEach(({ pc }) => {
-      const existingAudio = pc.getSenders().filter((s) => s.track?.kind === "audio");
-      const existingVideo = pc.getSenders().filter((s) => s.track?.kind === "video");
-
-      localStream.getAudioTracks().forEach((track) => {
-        if (!existingAudio.find((s) => s.track?.id === track.id)) {
-          const sender = pc.addTrack(track, localStream);
-          audioSenders.current.set(track.id, { sender, track });
-        }
-      });
-      localStream.getVideoTracks().forEach((track) => {
-        if (!existingVideo.find((s) => s.track?.id === track.id)) {
-          const sender = pc.addTrack(track, localStream);
-          videoSenders.current.set(track.id, { sender, track });
-        }
-      });
+      ensureTracksOnPeer(pc);
     });
-  }, [localStream]);
+  }, [localStream, ensureTracksOnPeer]);
 
   const toggleMic = useCallback(() => {
     if (micLocked) return;
     setMicOn((prev) => {
       const next = !prev;
-      localStream?.getAudioTracks().forEach((track) => {
-        track.enabled = next;
-      });
+      localStream?.getAudioTracks().forEach((t) => (t.enabled = next));
       if (localAudioTrackRef.current) localAudioTrackRef.current.enabled = next;
       socket?.emit("meeting:mic-state", { meetingId, muted: !next });
       return next;
@@ -425,9 +426,7 @@ export function useMeshCall(
   const toggleCamera = useCallback(() => {
     setCameraOn((prev) => {
       const next = !prev;
-      localStream?.getVideoTracks().forEach((track) => {
-        track.enabled = next;
-      });
+      localStream?.getVideoTracks().forEach((t) => (t.enabled = next));
       if (localVideoTrackRef.current) localVideoTrackRef.current.enabled = next;
       socket?.emit("meeting:camera-state", { meetingId, cameraOff: !next });
       return next;
@@ -452,24 +451,20 @@ export function useMeshCall(
     socket?.emit("meeting:mic-state", { meetingId, muted: false });
   }, [localStream, socket, meetingId]);
 
-  const unlockMic = useCallback(() => {
-    setMicLocked(false);
-  }, []);
+  const unlockMic = useCallback(() => setMicLocked(false), []);
 
   const replaceVideoTrackOnAllPeers = useCallback(
     (newTrack: MediaStreamTrack | null) => {
       peers.current.forEach(({ pc }) => {
         const sender = pc.getSenders().find((s) => s.track?.kind === "video");
         if (sender) {
-          sender.replaceTrack(newTrack).catch((err) => {
-            console.warn("replaceTrack failed:", err);
-          });
-        } else if (newTrack && localStream) {
-          pc.addTrack(newTrack, localStream);
+          sender.replaceTrack(newTrack).catch((err) => console.warn("replaceTrack failed:", err));
+        } else if (newTrack && localStreamRef.current) {
+          pc.addTrack(newTrack, localStreamRef.current);
         }
       });
     },
-    [localStream],
+    [],
   );
 
   const toggleScreenShare = useCallback(async () => {
@@ -502,8 +497,7 @@ export function useMeshCall(
 
       const handleTrackEnded = () => {
         if (screenTrackRef.current !== track) return;
-        const camTrack = localVideoTrackRef.current;
-        replaceVideoTrackOnAllPeers(camTrack);
+        replaceVideoTrackOnAllPeers(localVideoTrackRef.current);
         setScreenStream(null);
         setScreenSharing(false);
         screenTrackRef.current = null;
@@ -524,7 +518,7 @@ export function useMeshCall(
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
-        console.log("Screen share cancelled by user");
+        console.log("Screen share cancelled");
       } else {
         console.error("Screen share error:", err);
       }
@@ -532,13 +526,10 @@ export function useMeshCall(
   }, [screenSharing, socket, meetingId, myUserId, replaceVideoTrackOnAllPeers]);
 
   const cleanupAll = useCallback(() => {
-    isCleaningUp.current = true;
     localStream?.getTracks().forEach((t) => t.stop());
     screenStream?.getTracks().forEach((t) => t.stop());
     peers.current.forEach(({ pc }) => pc.close());
     peers.current.clear();
-    audioSenders.current.clear();
-    videoSenders.current.clear();
     localAudioTrackRef.current = null;
     localVideoTrackRef.current = null;
     screenTrackRef.current = null;
