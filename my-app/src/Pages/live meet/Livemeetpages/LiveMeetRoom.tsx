@@ -104,154 +104,152 @@ export const LiveMeetRoom = () => {
   }, [isHost]);
   const isPresenting = !!presenterId;
 
-useEffect(() => {
-  if (!socket || !meetingId) return;
+  useEffect(() => {
+    if (!socket || !meetingId) return;
 
-  socket.emit("meeting:join-room", { meetingId }, (r: any) => {
-    if (r?.meeting) {
-      setMeeting(r.meeting);
-      setParticipants(r.participants ?? []);
-    }
-  });
-
-  const onParts = (p: RoomParticipant[]) => setParticipants(p);
-  const onStarted = (e: any) => {
-    setMeeting(e.meeting);
-    setParticipants(e.participants ?? []);
-  };
-  const onApproved = (e: any) => {
-    setMeeting(e.meeting);
-    setParticipants(e.participants ?? []);
-  };
-  const onReq = (r: JoinRequest) => {
-    setRequests((p) =>
-      p.some((x) => x.userId === r.userId) ? p : [...p, r],
-    );
-    if (isHostRef.current) toast(`${r.userName} wants to join`);
-  };
-  const onMuted = (e: any) => {
-    const isPermanent = e.permanent === true || e.permanent === "true";
-    if (e.userId === myId) {
-      forceMuteSelfRef.current(isPermanent);
-      toast(
-        isPermanent
-          ? "Host permanently muted your microphone"
-          : "Host muted your microphone",
-      );
-    }
-    setParticipants((p) =>
-      p.map((x) =>
-        x.userId === e.userId
-          ? { ...x, muted: true, micLocked: isPermanent }
-          : x,
-      ),
-    );
-  };
-  const onUnmuted = (e: any) => {
-    if (e.userId === myId) {
-      forceUnmuteSelfRef.current();
-      toast.success("Host unmuted your microphone");
-    }
-    setParticipants((p) =>
-      p.map((x) =>
-        x.userId === e.userId
-          ? { ...x, muted: false, micLocked: false }
-          : x,
-      ),
-    );
-  };
-  const onMuteAll = () => {
-    setParticipants((prev) =>
-      prev.map((p) => (p.isHost ? p : { ...p, muted: true })),
-    );
-    if (!isHostRef.current) {
-      forceMuteSelfRef.current(false);
-      toast("Host muted everyone");
-    }
-  };
-  const onUnlocked = (e: any) => {
-    if (e.userId === myId) {
-      unlockMicRef.current();
-      toast("Host allowed you to unmute yourself");
-    }
-    setParticipants((p) =>
-      p.map((x) => (x.userId === e.userId ? { ...x, micLocked: false } : x)),
-    );
-  };
-  const onScreenShare = (e: { userId: string; sharing: boolean }) => {
-    setPresenterId((prev) => {
-      if (e.sharing) return e.userId;
-      return prev === e.userId ? null : prev;
+    socket.emit("meeting:join-room", { meetingId }, (r: any) => {
+      if (r?.meeting) {
+        setMeeting(r.meeting);
+        setParticipants(r.participants ?? []);
+      }
     });
-  };
-  const onRemoved = (e: any) => {
-    if (e.meetingId === meetingId) {
-      cleanupAllRef.current();
-      toast.error(
-        e.blocked
-          ? "You were removed and blocked from this meeting"
-          : "You were removed from the meeting",
+
+    const onParts = (p: RoomParticipant[]) => setParticipants(p);
+    const onStarted = (e: any) => {
+      setMeeting(e.meeting);
+      setParticipants(e.participants ?? []);
+    };
+    const onApproved = (e: any) => {
+      setMeeting(e.meeting);
+      setParticipants(e.participants ?? []);
+    };
+    const onReq = (r: JoinRequest) => {
+      setRequests((p) =>
+        p.some((x) => x.userId === r.userId) ? p : [...p, r],
       );
-      navigate("/live-meet");
-    }
-  };
-  const onEnded = () => {
-    setEnded(true);
-    cleanupAllRef.current();
-    setTimeout(() => navigate("/live-meet"), 1500);
-  };
-  const onLeft = (e: any) => disconnectParticipantRef.current(e.userId);
+      if (isHostRef.current) toast(`${r.userName} wants to join`);
+    };
+    const onMuted = (e: any) => {
+      const isPermanent = e.permanent === true || e.permanent === "true";
+      if (e.userId === myId) {
+        forceMuteSelfRef.current(isPermanent);
+        toast(
+          isPermanent
+            ? "Host permanently muted your microphone"
+            : "Host muted your microphone",
+        );
+      }
+      setParticipants((p) =>
+        p.map((x) =>
+          x.userId === e.userId
+            ? { ...x, muted: true, micLocked: isPermanent }
+            : x,
+        ),
+      );
+    };
+    const onUnmuted = (e: any) => {
+      if (e.userId === myId) {
+        forceUnmuteSelfRef.current();
+        toast.success("Host unmuted your microphone");
+      }
+      setParticipants((p) =>
+        p.map((x) =>
+          x.userId === e.userId ? { ...x, muted: false, micLocked: false } : x,
+        ),
+      );
+    };
+    const onMuteAll = () => {
+      setParticipants((prev) =>
+        prev.map((p) => (p.isHost ? p : { ...p, muted: true })),
+      );
+      if (!isHostRef.current) {
+        forceMuteSelfRef.current(false);
+        toast("Host muted everyone");
+      }
+    };
+    
+    const onUnlocked = (e: any) => {
+      if (e.userId === myId) {
+        unlockMicRef.current();
+        toast("Host allowed you to unmute yourself");
+      }
+      setParticipants((p) =>
+        p.map((x) => (x.userId === e.userId ? { ...x, micLocked: false } : x)),
+      );
+    };
+    const onScreenShare = (e: { userId: string; sharing: boolean }) => {
+      setPresenterId((prev) => {
+        if (e.sharing) return e.userId;
+        return prev === e.userId ? null : prev;
+      });
+    };
+    const onRemoved = (e: any) => {
+      if (e.meetingId === meetingId) {
+        cleanupAllRef.current();
+        toast.error(
+          e.blocked
+            ? "You were removed and blocked from this meeting"
+            : "You were removed from the meeting",
+        );
+        navigate("/live-meet");
+      }
+    };
+    const onEnded = () => {
+      setEnded(true);
+      cleanupAllRef.current();
+      setTimeout(() => navigate("/live-meet"), 1500);
+    };
+    const onLeft = (e: any) => disconnectParticipantRef.current(e.userId);
 
-  // === FIX: defined INSIDE the effect so no ReferenceError
-  const onCameraState = (e: { userId: string; cameraOff: boolean }) => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.userId === e.userId ? { ...p, cameraOff: e.cameraOff } : p,
-      ),
-    );
-  };
-  const onMicState = (e: { userId: string; muted: boolean }) => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.userId === e.userId ? { ...p, muted: e.muted } : p,
-      ),
-    );
-  };
+    // === FIX: defined INSIDE the effect so no ReferenceError
+    const onCameraState = (e: { userId: string; cameraOff: boolean }) => {
+      setParticipants((prev) =>
+        prev.map((p) =>
+          p.userId === e.userId ? { ...p, cameraOff: e.cameraOff } : p,
+        ),
+      );
+    };
+    const onMicState = (e: { userId: string; muted: boolean }) => {
+      setParticipants((prev) =>
+        prev.map((p) => (p.userId === e.userId ? { ...p, muted: e.muted } : p)),
+      );
+    };
 
-  socket.on("meeting:participants", onParts);
-  socket.on("meeting:started", onStarted);
-  socket.on("meeting:approved", onApproved);
-  socket.on("meeting:join-request", onReq);
-  socket.on("meeting:participant-muted", onMuted);
-  socket.on("meeting:muted-all", onMuteAll);
-  socket.on("meeting:mic-unlocked", onUnlocked);
-  socket.on("meeting:screen-share", onScreenShare);
-  socket.on("meeting:removed", onRemoved);
-  socket.on("meeting:ended", onEnded);
-  socket.on("meeting:participant-left", onLeft);
-  socket.on("meeting:participant-unmuted", onUnmuted);
-  socket.on("meeting:camera-state", onCameraState);
-  socket.on("meeting:mic-state", onMicState);
+    socket.on("meeting:participants", onParts);
+    socket.on("meeting:started", onStarted);
+    socket.on("meeting:approved", onApproved);
+    socket.on("meeting:join-request", onReq);
+    socket.on("meeting:participant-muted", onMuted);
+    socket.on("meeting:muted-all", onMuteAll);
+    socket
+    socket.on("meeting:mic-unlocked", onUnlocked);
+    socket.on("meeting:screen-share", onScreenShare);
+    socket.on("meeting:removed", onRemoved);
+    socket.on("meeting:ended", onEnded);
+    socket.on("meeting:participant-left", onLeft);
+    socket.on("meeting:participant-unmuted", onUnmuted);
+    socket.on("meeting:camera-state", onCameraState);
+    socket.on("meeting:mic-state", onMicState);
 
-  return () => {
-    socket.off("meeting:participants", onParts);
-    socket.off("meeting:started", onStarted);
-    socket.off("meeting:approved", onApproved);
-    socket.off("meeting:join-request", onReq);
-    socket.off("meeting:participant-muted", onMuted);
-    socket.off("meeting:muted-all", onMuteAll);
-    socket.off("meeting:mic-unlocked", onUnlocked);
-    socket.off("meeting:screen-share", onScreenShare);
-    socket.off("meeting:removed", onRemoved);
-    socket.off("meeting:ended", onEnded);
-    socket.off("meeting:participant-left", onLeft);
-    socket.off("meeting:participant-unmuted", onUnmuted);
-    socket.off("meeting:camera-state", onCameraState);
-    socket.off("meeting:mic-state", onMicState);
-    cleanupAllRef.current();
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [socket, meetingId]);    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      socket.off("meeting:participants", onParts);
+      socket.off("meeting:started", onStarted);
+      socket.off("meeting:approved", onApproved);
+      socket.off("meeting:join-request", onReq);
+      socket.off("meeting:participant-muted", onMuted);
+      socket.off("meeting:muted-all", onMuteAll);
+      socket.off("meeting:mic-unlocked", onUnlocked);
+      socket.off("meeting:screen-share", onScreenShare);
+      socket.off("meeting:removed", onRemoved);
+      socket.off("meeting:ended", onEnded);
+      socket.off("meeting:participant-left", onLeft);
+      socket.off("meeting:participant-unmuted", onUnmuted);
+      socket.off("meeting:camera-state", onCameraState);
+      socket.off("meeting:mic-state", onMicState);
+      cleanupAllRef.current();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, meetingId]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Reflect our own screen-share state as the presenter too, in case the
   // server doesn't echo "meeting:screen-share" back to the sender.
@@ -368,7 +366,13 @@ useEffect(() => {
     socket?.emit("meeting:mute-all", { meetingId });
     toast.success("Muted everyone");
   };
-
+const unmuteAll = () => {
+      socket?.emit("meeting:unmute-all", { meetingId });
+      setParticipants((prev) =>
+        prev.map((p) => (p.isHost || p.micLocked ? p : { ...p, muted: false })),
+      );
+      toast.success("Unmuted everyone");
+    };
   // Kicked out, but they're free to send a new join request later.
   const remove = (id: string) => {
     socket?.emit("meeting:remove", { meetingId, userId: id, block: false });
@@ -722,6 +726,15 @@ useEffect(() => {
                   className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2.5 text-[11px] font-semibold hover:bg-white/20"
                 >
                   <MicOff size={15} /> Mute all
+                </button>
+              )}
+              {isHost && (
+                <button
+                  onClick={unmuteAll}
+                  title="Unmute everyone"
+                  className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2.5 text-[11px] font-semibold hover:bg-white/20"
+                >
+                  <Mic size={15} /> Unmute all
                 </button>
               )}
               <span className="rounded-full bg-white/5 px-3 py-2 text-[10px] text-white/50">
