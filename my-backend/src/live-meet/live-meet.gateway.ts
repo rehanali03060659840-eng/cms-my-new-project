@@ -338,7 +338,29 @@ export class LiveMeetGateway implements OnGatewayConnection {
       .to(this.room(m._id))
       .emit('meeting:participants', this.participants(m));
   }
-
+@SubscribeMessage('meeting:unmute-all')
+unmuteAll(
+  @ConnectedSocket() socket: Socket,
+  @MessageBody() body: { meetingId: string },
+) {
+  const m = this.service.get(body.meetingId);
+  this.service.requireHost(m, this.user(socket));
+  for (const p of m.participants.values()) {
+    if (p.userId === m.hostId) continue;
+    // Locked (permanent mute) wale ko skip karo, host ne jaan bujh kar lock kiya hai
+    if (p.micLocked) continue;
+    p.muted = false;
+    for (const sid of p.socketIds)
+      this.server
+        .to(sid)
+        .emit('meeting:participant-unmuted', { userId: p.userId });
+  }
+  this.server.to(this.room(m._id)).emit('meeting:unmuted-all', {});
+  this.server
+    .to(this.room(m._id))
+    .emit('meeting:participants', this.participants(m));
+  return { ok: true };
+}
   // Self-reported mic/camera toggles - keeps everyone else's participant
   // list (and the MicOff / CAM OFF badges on their tiles) in sync.
   @SubscribeMessage('meeting:mic-state')

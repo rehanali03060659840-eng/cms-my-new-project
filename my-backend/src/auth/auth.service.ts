@@ -58,6 +58,10 @@ export class AuthService {
       const token = await withTimeout(
         this.jwtService.signAsync({
           sub: user._id.toString(),
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          role: user.role,
         }),
         DB_OPERATION_TIMEOUT_MS,
         'JWT signing',
